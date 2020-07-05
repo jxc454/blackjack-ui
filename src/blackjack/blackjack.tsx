@@ -1,6 +1,7 @@
 import React, { useReducer } from "react";
 import {
   concat,
+  difference,
   intersection,
   flatMap,
   inRange,
@@ -10,6 +11,7 @@ import {
   uniq,
   shuffle
 } from "lodash";
+import simulate from "./simulator";
 
 export enum GameState {
   Bet,
@@ -52,16 +54,17 @@ interface SettleAction {
 
 export type GameAction = BetAction | PlayerAction | DealerAction | SettleAction;
 
-const newDeck = shuffle(
-  flatMap(range(0, 4), () => range(1, 14).map(x => (x >= 10 ? 10 : x)))
-);
+export const buildNewDeck: () => number[] = () =>
+  shuffle(
+    flatMap(range(0, 4), () => range(1, 14).map(x => (x >= 10 ? 10 : x)))
+  );
 
 const initialState: Game = {
   state: GameState.Bet,
   bet: 0,
   playerCards: [],
   dealerCards: [],
-  deck: newDeck,
+  deck: buildNewDeck(),
   cash: 100
 };
 
@@ -81,7 +84,7 @@ const getScores: (values: number[]) => number[] = (values: number[]) => {
   );
 };
 
-const score: (values: number[]) => number = (values: number[]) => {
+export const score: (values: number[]) => number = (values: number[]) => {
   return max(getScores(values)) || 0;
 };
 
@@ -89,8 +92,8 @@ const isBlackJack: (values: number[]) => boolean = (values: number[]) => {
   return intersection(values, [1, 10]).length === 2 && values.length === 2;
 };
 
-const getCount: (deck: number[]) => number = (deck: number[]) =>
-  deck.reduce(
+export const getCount: (game: Game) => number = (game: Game) =>
+  concat(game.deck, game.dealerCards[1]).reduce(
     (count, k) => count + (k === 10 ? -1 : inRange(k, 3, 7) ? 1 : 0),
     0
   );
@@ -107,14 +110,16 @@ const dealerExecute: (
   return [newDeck, newDealerCards];
 };
 
-function reducer(game: Game, action: GameAction): Game {
+export function reducer(game: Game, action: GameAction): Game {
   switch (action.type) {
     case "bet":
       const deck =
-        game.deck.length > 10 ? [...game.deck] : shuffle([...newDeck]);
+        game.deck.length > 10 ? [...game.deck] : shuffle([...buildNewDeck()]);
 
       const playerCards = pullAt(deck, [0, 1]);
       const dealerCards = pullAt(deck, [0, 1]);
+
+      console.log(`deck length: ${deck.length}`);
 
       return {
         ...game,
@@ -179,6 +184,9 @@ function reducer(game: Game, action: GameAction): Game {
       if (isBlackJack(game.playerCards) && !isBlackJack(game.dealerCards)) {
         return {
           ...game,
+          playerCards: [],
+          dealerCards: [],
+          bet: 0,
           state: GameState.Bet,
           cash: game.cash + game.bet * 2.5
         };
@@ -189,6 +197,9 @@ function reducer(game: Game, action: GameAction): Game {
       ) {
         return {
           ...game,
+          playerCards: [],
+          dealerCards: [],
+          bet: 0,
           state: GameState.Bet,
           cash: game.cash + game.bet * 2
         };
@@ -199,12 +210,18 @@ function reducer(game: Game, action: GameAction): Game {
       ) {
         return {
           ...game,
+          playerCards: [],
+          dealerCards: [],
+          bet: 0,
           state: GameState.Bet,
           cash: game.cash
         };
       }
       return {
         ...game,
+        playerCards: [],
+        dealerCards: [],
+        bet: 0,
         state: GameState.Bet,
         cash: game.cash + game.bet
       };
@@ -212,14 +229,15 @@ function reducer(game: Game, action: GameAction): Game {
 }
 
 export default function Blackjack() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [game, dispatch] = useReducer(reducer, initialState);
 
-  switch (state.state) {
+  switch (game.state) {
     case GameState.Bet:
+      console.dir(game);
       return (
         <>
-          <div>{`CASH: ${state.cash}`}</div>
-          <div>{`COUNT: ${getCount(state.deck)}`}</div>
+          <div>{`CASH: ${game.cash}`}</div>
+          <div>{`COUNT: ${getCount(game)}`}</div>
           <span>BET: </span>
           <button onClick={() => dispatch({ type: "bet", value: 10 })}>
             10
@@ -234,12 +252,18 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
+      const [hitOutcome, stayOutcome] = simulate(
+        getCount(game),
+        game.playerCards,
+        game.dealerCards
+      );
+
       return (
         <>
-          <div>{`CASH: ${state.cash}`}</div>
-          <div>{`COUNT: ${getCount(state.deck)}`}</div>
-          <div>{`DEALER CARDS: ${state.dealerCards[0]}`}</div>
-          <div>{`PLAYER CARDS: ${state.playerCards}`}</div>
+          <div>{`CASH: ${game.cash}`}</div>
+          <div>{`COUNT: ${getCount(game)}`}</div>
+          <div>{`DEALER CARDS: ${game.dealerCards[0]}`}</div>
+          <div>{`PLAYER CARDS: ${game.playerCards}`}</div>
           <button
             onClick={() => dispatch({ type: "player", action: Action.Hit })}
           >
@@ -250,7 +274,7 @@ export default function Blackjack() {
           >
             STAY
           </button>
-          {state.playerCards.length === 2 && (
+          {game.playerCards.length === 2 && (
             <button
               onClick={() =>
                 dispatch({ type: "player", action: Action.DoubleDown })
@@ -259,19 +283,20 @@ export default function Blackjack() {
               DOUBLE
             </button>
           )}
+          <span>{`HIT: ${hitOutcome}, STAY: ${stayOutcome}`}</span>
           <br />
         </>
       );
     case GameState.Settle:
-      const playerScore = score(state.playerCards);
-      const dealerScore = score(state.dealerCards);
+      const playerScore = score(game.playerCards);
+      const dealerScore = score(game.dealerCards);
 
       return (
         <>
-          <div>{`CASH: ${state.cash}`}</div>
-          <div>{`COUNT: ${getCount(state.deck)}`}</div>
-          <div>{`DEALER CARDS: ${state.dealerCards}`}</div>
-          <div>{`PLAYER CARDS: ${state.playerCards}`}</div>
+          <div>{`CASH: ${game.cash}`}</div>
+          <div>COUNT: NA</div>
+          <div>{`DEALER CARDS: ${game.dealerCards}`}</div>
+          <div>{`PLAYER CARDS: ${game.playerCards}`}</div>
           <div>
             {playerScore > dealerScore
               ? "YOU WON"
