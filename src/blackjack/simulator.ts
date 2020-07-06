@@ -59,7 +59,7 @@ export const alignDeckWithCount: (deck: number[], count: number) => number[] = (
   return newDeck;
 };
 
-const dealCardsFromDeck: (deck: number[], cards: number[]) => number[] = (
+export const dealCardsFromDeck: (deck: number[], cards: number[]) => number[] = (
   deck: number[],
   cards: number[]
 ) => {
@@ -70,7 +70,7 @@ const dealCardsFromDeck: (deck: number[], cards: number[]) => number[] = (
   return newDeck;
 };
 
-const addDealerCard: (deck: number[], card: number) => [number[], number] = (
+export const addDealerCardNoBlackJack: (deck: number[], card: number) => [number[], number] = (
   deck: number[],
   card: number
 ) => {
@@ -107,7 +107,7 @@ const simulate: (
     const outcomesMatrix = range(0, 350).map(() => {
       // execute each action
       const outcomes = actions.map(action => {
-        const [deckMinusDealerCard, secondDealerCard] = addDealerCard(
+        const [deckMinusDealerCard, secondDealerCard] = addDealerCardNoBlackJack(
           deck,
           dealerCards[0]
         );

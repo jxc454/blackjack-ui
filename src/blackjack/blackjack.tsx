@@ -21,7 +21,8 @@ export enum GameState {
 export enum Action {
   Hit,
   Stay,
-  DoubleDown
+  DoubleDown,
+  Split
 }
 
 export interface Game {
@@ -94,10 +95,10 @@ export const isBlackJack: (values: number[]) => boolean = (
 };
 
 export const getCount: (deck: number[]) => number = (deck: number[]) =>
-    deck.reduce(
-        (count, k) => count + (k === 10 ? 1 : inRange(k, 3, 7) ? -1 : 0),
-        0
-    );
+  deck.reduce(
+    (count, k) => count + (k === 10 ? 1 : inRange(k, 3, 7) ? -1 : 0),
+    0
+  );
 
 export const getCountForGame: (game: Game) => number = (game: Game) =>
   getCount(concat(game.deck, game.dealerCards[1]));
@@ -173,6 +174,7 @@ export function reducer(game: Game, action: GameAction): Game {
           cash: game.cash - game.bet
         };
       }
+
 
       const newDeck = [...game.deck];
       const newPlayerCards = concat(game.playerCards, pullAt(newDeck, 0));
