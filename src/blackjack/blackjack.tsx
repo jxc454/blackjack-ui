@@ -1,21 +1,32 @@
 import React, { useReducer } from "react";
 import {
+  cloneDeep,
   concat,
-  intersection,
   flatMap,
+  head,
   inRange,
-  range,
+  intersection,
   max,
   pullAt,
-  uniq,
-  shuffle
+  range,
+  shuffle,
+  sum,
+  tail,
+  uniq
 } from "lodash";
-import simulate from "./simulator";
+// import simulate from "./simulator";
+// import { Simulate } from "react-dom/test-utils";
 
 export enum GameState {
   Bet,
   PlayerAction,
   Settle
+}
+
+export enum HandStage {
+  PlayerAction,
+  Settle,
+  Busted
 }
 
 export enum Action {
@@ -25,11 +36,17 @@ export enum Action {
   Split
 }
 
-export interface Game {
-  state: GameState;
+export interface Hand {
+  cards: number[];
   bet: number;
-  playerCards: number[];
-  dealerCards: number[];
+  stage: HandStage;
+}
+
+export interface Game {
+  dealerHole: number | undefined;
+  dealerPocket: number[];
+  state: GameState;
+  hands: Hand[];
   deck: number[];
   cash: number;
 }
@@ -61,9 +78,9 @@ export const buildNewDeck: () => number[] = () =>
 
 const initialState: Game = {
   state: GameState.Bet,
-  bet: 0,
-  playerCards: [],
-  dealerCards: [],
+  hands: [],
+  dealerHole: undefined,
+  dealerPocket: [],
   deck: buildNewDeck(),
   cash: 100
 };
@@ -101,7 +118,7 @@ export const getCount: (deck: number[]) => number = (deck: number[]) =>
   );
 
 export const getCountForGame: (game: Game) => number = (game: Game) =>
-  getCount(concat(game.deck, game.dealerCards[1]));
+  getCount(concat(game.deck, game.dealerHole));
 
 export const dealerExecute: (
   deck: number[],
@@ -126,10 +143,16 @@ export function reducer(game: Game, action: GameAction): Game {
 
       return {
         ...game,
-        bet: action.value,
         deck: deck,
-        playerCards,
-        dealerCards,
+        hands: [
+          {
+            bet: action.value,
+            cards: playerCards,
+            stage: HandStage.PlayerAction
+          }
+        ],
+        dealerHole: head(dealerCards),
+        dealerPocket: tail(dealerCards),
         state:
           isBlackJack(playerCards) || isBlackJack(dealerCards)
             ? GameState.Settle
@@ -138,98 +161,223 @@ export function reducer(game: Game, action: GameAction): Game {
       };
     case "player":
       if (action.action === Action.Stay) {
-        const [newDeck, newDealerCards] = dealerExecute(
-          game.deck,
-          game.dealerCards
+        const newHands = cloneDeep(game.hands);
+        // find first hand with PlayerAction
+        const activeHand = newHands.find(
+          ({ stage }) => stage === HandStage.PlayerAction
         );
-        return {
-          ...game,
-          deck: newDeck,
-          dealerCards: newDealerCards,
-          state: GameState.Settle
-        };
-      }
-      if (action.action === Action.DoubleDown) {
-        const newPlayerCards = concat(game.playerCards, pullAt(game.deck, 0));
-        if (!bestScore(newPlayerCards)) {
+
+        if (!activeHand) {
+          throw new Error(
+            "reducer got 'Action.Stay' but found no active hand."
+          );
+        }
+
+        // set activeHand stage to Settle
+        activeHand.stage = HandStage.Settle;
+
+        // total active hands remaining
+        const activeHands = newHands.some(
+          hand => hand.stage === HandStage.PlayerAction
+        );
+
+        if (activeHands) {
           return {
             ...game,
-            bet: game.bet * 2,
-            playerCards: newPlayerCards,
-            state: GameState.Settle,
-            cash: game.cash - game.bet
+            hands: newHands
           };
         }
         const [newDeck, newDealerCards] = dealerExecute(
           game.deck,
-          game.dealerCards
+          concat(game.dealerHole, game.dealerPocket)
         );
         return {
           ...game,
-          bet: game.bet * 2,
+          hands: newHands,
           deck: newDeck,
-          dealerCards: newDealerCards,
-          playerCards: newPlayerCards,
+          dealerHole: game.dealerHole,
+          dealerPocket: tail(newDealerCards),
+          state: GameState.Settle
+        };
+      }
+      if (action.action === Action.DoubleDown) {
+        // find first hand with PlayerAction
+        const newHands = cloneDeep(game.hands);
+        const newDeck = [...game.deck];
+
+        const activeHand = newHands.find(
+          hand => hand.stage === HandStage.PlayerAction
+        );
+
+        if (!activeHand) {
+          throw new Error(
+            "reducer got 'Action.DoubleDown' but found no active hand."
+          );
+        }
+
+        const newCash = game.cash - activeHand.bet;
+        activeHand.bet = 2 * activeHand.bet;
+        activeHand.cards = concat(activeHand.cards, pullAt(newDeck, 0));
+        activeHand.stage = bestScore(activeHand.cards)
+          ? HandStage.Settle
+          : HandStage.Busted;
+
+        // total active hands remaining
+        const activeHands = newHands.some(
+          ({ stage }) => stage === HandStage.PlayerAction
+        );
+
+        if (activeHands) {
+          return {
+            ...game,
+            deck: newDeck,
+            hands: newHands,
+            cash: newCash
+          };
+        }
+
+        if (newHands.every(({ stage }) => HandStage.Busted)) {
+          return {
+            ...game,
+            deck: newDeck,
+            hands: newHands,
+            cash: newCash,
+            state: GameState.Settle
+          };
+        }
+
+        const [newDeckFinal, newDealerCards] = dealerExecute(
+          newDeck,
+          concat(game.dealerHole, game.dealerPocket)
+        );
+        return {
+          ...game,
+          deck: newDeckFinal,
+          dealerPocket: tail(newDealerCards),
+          hands: newHands,
           state: GameState.Settle,
-          cash: game.cash - game.bet
+          cash: newCash
+        };
+      }
+      if (action.action === Action.Split) {
+        // const newDeck = [...game.deck];
+        //
+        // const [splitCard1, splitCard2] = game.playerCards;
+        // const splitHand1 = concat(splitCard1, pullAt(newDeck, 0));
+        // const splitHand2 = concat(splitCard2, pullAt(newDeck, 0));
+        //
+        // return {
+        //   ...game,
+        //   playerCards: [splitHand1, splitHand2],
+        //   deck: newDeck
+        // };
+      }
+
+      // hit
+      // find first hand with PlayerAction
+      const newHands = cloneDeep(game.hands);
+      const newDeck = [...game.deck];
+
+      const activeHand = newHands.find(
+        ({ stage }) => stage === HandStage.PlayerAction
+      );
+
+      if (!activeHand) {
+        throw new Error("reducer got 'Action.Hit' but found no active hand.");
+      }
+      activeHand.cards = concat(activeHand.cards, pullAt(newDeck, 0));
+      activeHand.stage = bestScore(activeHand.cards)
+        ? HandStage.PlayerAction
+        : HandStage.Busted;
+
+      // total active hands remaining
+      const activeHands = newHands.some(
+        ({ stage }) => stage === HandStage.PlayerAction
+      );
+
+      if (activeHands) {
+        return {
+          ...game,
+          deck: newDeck,
+          hands: newHands
         };
       }
 
+      if (newHands.every(({ stage }) => HandStage.Busted)) {
+        return {
+          ...game,
+          deck: newDeck,
+          hands: newHands,
+          state: GameState.Settle
+        };
+      }
 
-      const newDeck = [...game.deck];
-      const newPlayerCards = concat(game.playerCards, pullAt(newDeck, 0));
-      const scores = getScores(newPlayerCards);
+      const [newDeckFinal, newDealerCards] = dealerExecute(
+        newDeck,
+        concat(game.dealerHole, game.dealerPocket)
+      );
 
       return {
         ...game,
-        deck: newDeck,
-        playerCards: newPlayerCards,
-        state: scores.length ? GameState.PlayerAction : GameState.Settle
+        hands: newHands,
+        dealerPocket: tail(newDealerCards),
+        deck: newDeckFinal,
+        state: GameState.Settle
       };
     case "settle":
-      if (isBlackJack(game.playerCards) && !isBlackJack(game.dealerCards)) {
+      const baseNewGame: Game = {
+        ...game,
+        hands: [],
+        dealerHole: undefined,
+        dealerPocket: [],
+        state: GameState.Bet
+      };
+      if (isBlackJack(concat(game.dealerHole, game.dealerPocket))) {
         return {
-          ...game,
-          playerCards: [],
-          dealerCards: [],
-          bet: 0,
-          state: GameState.Bet,
-          cash: game.cash + game.bet * 2.5
+          ...baseNewGame,
+          cash:
+            game.cash +
+            sum(
+              game.hands.map(({ cards, bet }) => (isBlackJack(cards) ? bet : 0))
+            )
         };
       }
-      if (
-        !game.dealerCards.length ||
-        bestScore(game.dealerCards) < bestScore(game.playerCards)
-      ) {
+
+      const dealerScore = bestScore(concat(game.dealerHole, game.dealerPocket));
+      if (!dealerScore) {
         return {
-          ...game,
-          playerCards: [],
-          dealerCards: [],
-          bet: 0,
-          state: GameState.Bet,
-          cash: game.cash + game.bet * 2
+          ...baseNewGame,
+          cash:
+            game.cash +
+            sum(
+              game.hands.map(({ stage, bet }) =>
+                stage === HandStage.Busted ? 0 : bet * 2
+              )
+            )
         };
       }
-      if (
-        !game.playerCards.length ||
-        bestScore(game.playerCards) < bestScore(game.dealerCards)
-      ) {
-        return {
-          ...game,
-          playerCards: [],
-          dealerCards: [],
-          bet: 0,
-          state: GameState.Bet,
-          cash: game.cash
-        };
-      }
+
       return {
         ...game,
-        playerCards: [],
-        dealerCards: [],
-        bet: 0,
+        hands: [],
+        dealerHole: undefined,
+        dealerPocket: [],
         state: GameState.Bet,
-        cash: game.cash + game.bet
+        cash:
+          game.cash +
+          sum(
+            game.hands.map(({ cards, bet, stage }) => {
+              if (stage === HandStage.Busted) {
+                return 0;
+              }
+
+              const playerScore = bestScore(cards);
+              if (dealerScore === playerScore) {
+                return bet;
+              }
+              return dealerScore > playerScore ? 0 : bet * 2;
+            })
+          )
       };
   }
 }
@@ -257,18 +405,27 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
-      const [hitOutcome, stayOutcome] = simulate(
-        getCountForGame(game),
-        game.playerCards,
-        game.dealerCards
+      const activeHand = game.hands.find(
+        ({ stage }) => stage === HandStage.PlayerAction
       );
+      // const [hitOutcome, stayOutcome] = simulate(
+      //   getCountForGame(game),
+      //   activeHand.cards,
+      //   concat(game.dealerHole, game.dealerPocket)
+      // );
+
+      const [hitOutcome, stayOutcome] = [0, 0];
 
       return (
         <>
           <div>{`CASH: ${game.cash}`}</div>
           <div>{`COUNT: ${getCountForGame(game)}`}</div>
-          <div>{`DEALER CARDS: ${game.dealerCards[0]}`}</div>
-          <div>{`PLAYER CARDS: ${game.playerCards}`}</div>
+          <div>{`DEALER CARDS: ${game.dealerHole}`}</div>
+          {game.hands.map(({ cards }, index) => (
+            <div
+              key={`${cards.toString()}|${index}`}
+            >{`PLAYER CARDS: ${cards}`}</div>
+          ))}
           <button
             onClick={() => dispatch({ type: "player", action: Action.Hit })}
           >
@@ -279,7 +436,7 @@ export default function Blackjack() {
           >
             {`STAY: ${stayOutcome}`}
           </button>
-          {game.playerCards.length === 2 && (
+          {activeHand.cards.length === 2 && (
             <button
               onClick={() =>
                 dispatch({ type: "player", action: Action.DoubleDown })
@@ -292,22 +449,28 @@ export default function Blackjack() {
         </>
       );
     case GameState.Settle:
-      const playerScore = bestScore(game.playerCards);
-      const dealerScore = bestScore(game.dealerCards);
+      const dealerScore = bestScore(concat(game.dealerHole, game.dealerPocket));
 
       return (
         <>
           <div>{`CASH: ${game.cash}`}</div>
           <div>COUNT: NA</div>
-          <div>{`DEALER CARDS: ${game.dealerCards}`}</div>
-          <div>{`PLAYER CARDS: ${game.playerCards}`}</div>
-          <div>
-            {playerScore > dealerScore
-              ? "YOU WON"
-              : dealerScore > playerScore
-              ? "YOU LOST"
-              : "PUSH"}
-          </div>
+          <div>{`DEALER CARDS: ${concat(
+            game.dealerHole,
+            game.dealerPocket
+          )}`}</div>
+          {game.hands.map(({ cards }, index) => (
+            <div key={`${cards.toString()}|${index}`}>
+              <span>{`PLAYER CARDS: ${cards}`}</span>
+              <span>
+                {bestScore(cards) > dealerScore
+                  ? " - YOU WON"
+                  : dealerScore > bestScore(cards)
+                  ? " - YOU LOST"
+                  : " - PUSH"}
+              </span>
+            </div>
+          ))}
           <button onClick={() => dispatch({ type: "settle" })}>OK</button>
           <br />
           <br />
