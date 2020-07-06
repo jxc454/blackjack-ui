@@ -1,7 +1,6 @@
 import React, { useReducer } from "react";
 import {
   concat,
-  difference,
   intersection,
   flatMap,
   inRange,
@@ -68,7 +67,7 @@ const initialState: Game = {
   cash: 100
 };
 
-const getScores: (values: number[]) => number[] = (values: number[]) => {
+export const getScores: (values: number[]) => number[] = (values: number[]) => {
   return uniq(
     values
       .reduce(
@@ -84,21 +83,26 @@ const getScores: (values: number[]) => number[] = (values: number[]) => {
   );
 };
 
-export const score: (values: number[]) => number = (values: number[]) => {
+export const bestScore: (values: number[]) => number = (values: number[]) => {
   return max(getScores(values)) || 0;
 };
 
-const isBlackJack: (values: number[]) => boolean = (values: number[]) => {
+export const isBlackJack: (values: number[]) => boolean = (
+  values: number[]
+) => {
   return intersection(values, [1, 10]).length === 2 && values.length === 2;
 };
 
-export const getCount: (game: Game) => number = (game: Game) =>
-  concat(game.deck, game.dealerCards[1]).reduce(
-    (count, k) => count + (k === 10 ? -1 : inRange(k, 3, 7) ? 1 : 0),
-    0
-  );
+export const getCount: (deck: number[]) => number = (deck: number[]) =>
+    deck.reduce(
+        (count, k) => count + (k === 10 ? -1 : inRange(k, 3, 7) ? 1 : 0),
+        0
+    );
 
-const dealerExecute: (
+export const getCountForGame: (game: Game) => number = (game: Game) =>
+  getCount(concat(game.deck, game.dealerCards[1]));
+
+export const dealerExecute: (
   deck: number[],
   dealerHand: number[]
 ) => [number[], number[]] = (deck: number[], dealerHand: number[]) => {
@@ -114,12 +118,10 @@ export function reducer(game: Game, action: GameAction): Game {
   switch (action.type) {
     case "bet":
       const deck =
-        game.deck.length > 10 ? [...game.deck] : shuffle([...buildNewDeck()]);
+        game.deck.length > 10 ? [...game.deck] : shuffle(buildNewDeck());
 
       const playerCards = pullAt(deck, [0, 1]);
       const dealerCards = pullAt(deck, [0, 1]);
-
-      console.log(`deck length: ${deck.length}`);
 
       return {
         ...game,
@@ -148,7 +150,7 @@ export function reducer(game: Game, action: GameAction): Game {
       }
       if (action.action === Action.DoubleDown) {
         const newPlayerCards = concat(game.playerCards, pullAt(game.deck, 0));
-        if (!score(newPlayerCards)) {
+        if (!bestScore(newPlayerCards)) {
           return {
             ...game,
             bet: game.bet * 2,
@@ -171,15 +173,17 @@ export function reducer(game: Game, action: GameAction): Game {
           cash: game.cash - game.bet
         };
       }
-      const newPlayerCards = concat(game.playerCards, pullAt(game.deck, 0));
+
+      const newDeck = [...game.deck];
+      const newPlayerCards = concat(game.playerCards, pullAt(newDeck, 0));
       const scores = getScores(newPlayerCards);
 
       return {
         ...game,
+        deck: newDeck,
         playerCards: newPlayerCards,
         state: scores.length ? GameState.PlayerAction : GameState.Settle
       };
-
     case "settle":
       if (isBlackJack(game.playerCards) && !isBlackJack(game.dealerCards)) {
         return {
@@ -193,7 +197,7 @@ export function reducer(game: Game, action: GameAction): Game {
       }
       if (
         !game.dealerCards.length ||
-        score(game.dealerCards) < score(game.playerCards)
+        bestScore(game.dealerCards) < bestScore(game.playerCards)
       ) {
         return {
           ...game,
@@ -206,7 +210,7 @@ export function reducer(game: Game, action: GameAction): Game {
       }
       if (
         !game.playerCards.length ||
-        score(game.playerCards) < score(game.dealerCards)
+        bestScore(game.playerCards) < bestScore(game.dealerCards)
       ) {
         return {
           ...game,
@@ -233,11 +237,10 @@ export default function Blackjack() {
 
   switch (game.state) {
     case GameState.Bet:
-      console.dir(game);
       return (
         <>
           <div>{`CASH: ${game.cash}`}</div>
-          <div>{`COUNT: ${getCount(game)}`}</div>
+          <div>{`COUNT: ${getCountForGame(game)}`}</div>
           <span>BET: </span>
           <button onClick={() => dispatch({ type: "bet", value: 10 })}>
             10
@@ -253,7 +256,7 @@ export default function Blackjack() {
       );
     case GameState.PlayerAction:
       const [hitOutcome, stayOutcome] = simulate(
-        getCount(game),
+        getCountForGame(game),
         game.playerCards,
         game.dealerCards
       );
@@ -261,7 +264,7 @@ export default function Blackjack() {
       return (
         <>
           <div>{`CASH: ${game.cash}`}</div>
-          <div>{`COUNT: ${getCount(game)}`}</div>
+          <div>{`COUNT: ${getCountForGame(game)}`}</div>
           <div>{`DEALER CARDS: ${game.dealerCards[0]}`}</div>
           <div>{`PLAYER CARDS: ${game.playerCards}`}</div>
           <button
@@ -288,8 +291,8 @@ export default function Blackjack() {
         </>
       );
     case GameState.Settle:
-      const playerScore = score(game.playerCards);
-      const dealerScore = score(game.dealerCards);
+      const playerScore = bestScore(game.playerCards);
+      const dealerScore = bestScore(game.dealerCards);
 
       return (
         <>

@@ -5,13 +5,13 @@ export default function RefWorkout() {
   const count = useRef({ value: 0 });
   const h1 = useRef<HTMLHeadingElement>(null);
 
-  const toggleChecked = () => {
-    cb.current.checked = !cb.current.checked;
-  };
-
-  const addInBed = () => {
-    cb.current.value = `${cb.current.value}, in bed.`;
-  };
+  // const toggleChecked = () => {
+  //   cb.current.checked = !cb.current.checked;
+  // };
+  //
+  // const addInBed = () => {
+  //   cb.current.value = `${cb.current.value}, in bed.`;
+  // };
 
   const focusInput = () => {
     count.current.value++;
