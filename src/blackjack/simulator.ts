@@ -6,7 +6,9 @@ import {
   getCountForGame,
   isBlackJack,
   reducer,
-  bestScore, getCount
+  bestScore,
+  getCount,
+  getScores
 } from "./blackjack";
 import {
   compact,
@@ -15,6 +17,7 @@ import {
   findIndex,
   max,
   mean,
+  memoize,
   pullAt,
   range,
   round,
@@ -25,7 +28,6 @@ export const alignDeckWithCount: (deck: number[], count: number) => number[] = (
   deck: number[],
   count: number
 ) => {
-  console.log(`desired count: ${count}`);
   const newDeck: number[] = [];
   let currentCount = getCount(deck);
 
@@ -81,79 +83,86 @@ const addDealerCard: (deck: number[], card: number) => [number[], number] = (
   return [compact(newDeck), nextCard];
 };
 
-export default function simulate(
+const simulate: (
   count: number,
   playerCards: number[],
   dealerCards: number[]
-): [number, number] {
-  if (bestScore(playerCards) <= 0) {
-    return [0, 0];
-  }
+) => [number, number] = memoize(
+  (count: number, playerCards: number[], dealerCards: number[]) => {
+    if (bestScore(playerCards) <= 0) {
+      return [0, 0];
+    }
 
-  // create deck
-  // deal out player cards, dealer card
-  // square deck with count
-  // TODO - create a Deck class so these methods can be chained instead of nested
-  const deck = alignDeckWithCount(
-    dealCardsFromDeck(buildNewDeck(), concat(playerCards, dealerCards[0])),
-    count
-  );
+    // create deck
+    // deal out player cards, dealer card
+    // square deck with count
+    // TODO - create a Deck class so these methods can be chained instead of nested
+    const deck = alignDeckWithCount(
+      dealCardsFromDeck(buildNewDeck(), concat(playerCards, dealerCards[0])),
+      count
+    );
 
-  const actions = [Action.Hit, Action.Stay];
+    const actions = [Action.Hit, Action.Stay];
 
-  const outcomesMatrix = range(0, 15).map(() => {
-    // execute each action
-    const outcomes = actions.map(action => {
-      // TODO - add a card to dealerCards, verify first 2 cards are not blackjack
-      const [deckMinusDealerCard, secondDealerCard] = addDealerCard(
-        deck,
-        dealerCards[0]
-      );
+    const outcomesMatrix = range(0, 350).map(() => {
+      // execute each action
+      const outcomes = actions.map(action => {
+        const [deckMinusDealerCard, secondDealerCard] = addDealerCard(
+          deck,
+          dealerCards[0]
+        );
 
-      const newGameState: Game = reducer(
-        {
-          dealerCards: concat(dealerCards[0], secondDealerCard),
-          deck: deckMinusDealerCard,
-          playerCards,
-          bet: 1,
-          cash: 0,
-          state: GameState.PlayerAction
-        },
-        { type: "player", action }
-      );
+        const newGameState: Game = reducer(
+          {
+            dealerCards: concat(dealerCards[0], secondDealerCard),
+            deck: deckMinusDealerCard,
+            playerCards,
+            bet: 1,
+            cash: 0,
+            state: GameState.PlayerAction
+          },
+          { type: "player", action }
+        );
 
-      if (newGameState.state == GameState.Settle) {
-        // player wins
-        if (
-          !newGameState.dealerCards.length ||
-          bestScore(newGameState.dealerCards) < bestScore(newGameState.playerCards)
-        ) {
-          return newGameState.bet * 2;
+        if (newGameState.state == GameState.Settle) {
+          // player wins
+          if (
+            !newGameState.dealerCards.length ||
+            bestScore(newGameState.dealerCards) <
+              bestScore(newGameState.playerCards)
+          ) {
+            return newGameState.bet * 2;
+          }
+          // player loses
+          if (
+            !newGameState.playerCards.length ||
+            bestScore(newGameState.playerCards) <
+              bestScore(newGameState.dealerCards)
+          ) {
+            return 0;
+          }
+          // push
+          return newGameState.bet;
         }
-        // player loses
-        if (
-          !newGameState.playerCards.length ||
-          bestScore(newGameState.playerCards) < bestScore(newGameState.dealerCards)
-        ) {
-          return 0;
-        }
-        // push
-        return newGameState.bet;
-      }
 
-      // play is not settled, simulate on new state
-      const x = simulate(
-        getCountForGame({...newGameState}),
-        newGameState.playerCards,
-        dealerCards
-      );
-      return max([x[0], x[1]]);
+        // play is not settled, simulate on new state
+        const x = simulate(
+          getCountForGame({ ...newGameState }),
+          newGameState.playerCards,
+          dealerCards
+        );
+        return max([x[0], x[1]]);
+      });
+      return [outcomes[0], outcomes[1]];
     });
-    return [outcomes[0], outcomes[1]];
-  });
 
-  return [
-    round(mean(outcomesMatrix.map(([hit, _]) => hit)), 1),
-    round(mean(outcomesMatrix.map(([_, stay]) => stay)), 1)
-  ];
-}
+    return [
+      round(mean(outcomesMatrix.map(([hit, _]) => hit)), 2),
+      round(mean(outcomesMatrix.map(([_, stay]) => stay)), 2)
+    ];
+  },
+  (count, playerCards, dealerCards) =>
+    `${count}|${getScores(playerCards)}|${dealerCards[0]}`
+);
+
+export default simulate;

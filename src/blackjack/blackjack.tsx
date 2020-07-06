@@ -95,7 +95,7 @@ export const isBlackJack: (values: number[]) => boolean = (
 
 export const getCount: (deck: number[]) => number = (deck: number[]) =>
     deck.reduce(
-        (count, k) => count + (k === 10 ? -1 : inRange(k, 3, 7) ? 1 : 0),
+        (count, k) => count + (k === 10 ? 1 : inRange(k, 3, 7) ? -1 : 0),
         0
     );
 
@@ -270,12 +270,12 @@ export default function Blackjack() {
           <button
             onClick={() => dispatch({ type: "player", action: Action.Hit })}
           >
-            HIT
+            {`HIT: ${hitOutcome}`}
           </button>
           <button
             onClick={() => dispatch({ type: "player", action: Action.Stay })}
           >
-            STAY
+            {`STAY: ${stayOutcome}`}
           </button>
           {game.playerCards.length === 2 && (
             <button
@@ -286,7 +286,6 @@ export default function Blackjack() {
               DOUBLE
             </button>
           )}
-          <span>{`HIT: ${hitOutcome}, STAY: ${stayOutcome}`}</span>
           <br />
         </>
       );
