@@ -17,6 +17,8 @@ import {
 // import simulate from "./simulator";
 // import { Simulate } from "react-dom/test-utils";
 
+import Hand from "../app/components/Hand";
+
 export enum GameState {
   Bet,
   PlayerAction,
@@ -236,7 +238,7 @@ export function reducer(game: Game, action: GameAction): Game {
           };
         }
 
-        if (newHands.every(({ stage }) => HandStage.Busted)) {
+        if (newHands.every(({ stage }) => stage === HandStage.Busted)) {
           return {
             ...game,
             deck: newDeck,
@@ -260,17 +262,53 @@ export function reducer(game: Game, action: GameAction): Game {
         };
       }
       if (action.action === Action.Split) {
-        // const newDeck = [...game.deck];
-        //
-        // const [splitCard1, splitCard2] = game.playerCards;
-        // const splitHand1 = concat(splitCard1, pullAt(newDeck, 0));
-        // const splitHand2 = concat(splitCard2, pullAt(newDeck, 0));
-        //
-        // return {
-        //   ...game,
-        //   playerCards: [splitHand1, splitHand2],
-        //   deck: newDeck
-        // };
+        const newHands = cloneDeep(game.hands);
+        const newDeck = [...game.deck];
+
+        const activeHand = newHands.find(
+          ({ stage }) => stage === HandStage.PlayerAction
+        );
+
+        if (!activeHand) {
+          throw new Error(
+            "reducer got 'Action.Split' but found no active hand."
+          );
+        }
+
+        const [splitCard1, splitCard2] = activeHand.cards;
+        const splitHand1 = concat(splitCard1, pullAt(newDeck, 0));
+        const splitHand2 = concat(splitCard2, pullAt(newDeck, 0));
+
+        const splitHands = [
+          {
+            cards: splitHand1,
+            bet: activeHand.bet,
+            stage: isBlackJack(splitHand1)
+              ? HandStage.Settle
+              : HandStage.PlayerAction
+          },
+          {
+            cards: splitHand2,
+            bet: activeHand.bet,
+            stage: isBlackJack(splitHand2)
+              ? HandStage.Settle
+              : HandStage.PlayerAction
+          }
+        ];
+
+        const allHands = concat(newHands, splitHands).filter(
+          hand => hand !== activeHand
+        );
+
+        return {
+          ...game,
+          deck: newDeck,
+          cash: game.cash - activeHand.bet,
+          hands: allHands,
+          state: allHands.some(({ stage }) => stage === HandStage.PlayerAction)
+            ? GameState.PlayerAction
+            : GameState.Settle
+        };
       }
 
       // hit
@@ -303,7 +341,7 @@ export function reducer(game: Game, action: GameAction): Game {
         };
       }
 
-      if (newHands.every(({ stage }) => HandStage.Busted)) {
+      if (newHands.every(({ stage }) => stage === HandStage.Busted)) {
         return {
           ...game,
           deck: newDeck,
@@ -371,6 +409,10 @@ export function reducer(game: Game, action: GameAction): Game {
                 return 0;
               }
 
+              if (isBlackJack(cards)) {
+                return bet * 2.5;
+              }
+
               const playerScore = bestScore(cards);
               if (dealerScore === playerScore) {
                 return bet;
@@ -384,6 +426,9 @@ export function reducer(game: Game, action: GameAction): Game {
 
 export default function Blackjack() {
   const [game, dispatch] = useReducer(reducer, initialState);
+  const activeHand = game.hands.find(
+    ({ stage }) => stage === HandStage.PlayerAction
+  );
 
   switch (game.state) {
     case GameState.Bet:
@@ -405,9 +450,6 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
-      const activeHand = game.hands.find(
-        ({ stage }) => stage === HandStage.PlayerAction
-      );
       // const [hitOutcome, stayOutcome] = simulate(
       //   getCountForGame(game),
       //   activeHand.cards,
@@ -421,11 +463,22 @@ export default function Blackjack() {
           <div>{`CASH: ${game.cash}`}</div>
           <div>{`COUNT: ${getCountForGame(game)}`}</div>
           <div>{`DEALER CARDS: ${game.dealerHole}`}</div>
-          {game.hands.map(({ cards }, index) => (
-            <div
-              key={`${cards.toString()}|${index}`}
-            >{`PLAYER CARDS: ${cards}`}</div>
-          ))}
+          {game.hands.map((hand, index) => {
+            const { cards, stage, bet } = hand;
+            return (
+              <Hand
+                key={`${cards.toString()}|${index}`}
+                text={`PLAYER CARDS: ${cards} (${bet})${
+                  stage === HandStage.Busted
+                    ? " - YOU LOST"
+                    : isBlackJack(cards)
+                    ? " - BLACKJACK"
+                    : ""
+                }`}
+                active={hand === activeHand}
+              />
+            );
+          })}
           <button
             onClick={() => dispatch({ type: "player", action: Action.Hit })}
           >
@@ -436,7 +489,7 @@ export default function Blackjack() {
           >
             {`STAY: ${stayOutcome}`}
           </button>
-          {activeHand.cards.length === 2 && (
+          {activeHand?.cards.length === 2 && (
             <button
               onClick={() =>
                 dispatch({ type: "player", action: Action.DoubleDown })
@@ -445,6 +498,16 @@ export default function Blackjack() {
               DOUBLE
             </button>
           )}
+          {activeHand?.cards.length === 2 &&
+            activeHand.cards[0] === activeHand.cards[1] && (
+              <button
+                onClick={() =>
+                  dispatch({ type: "player", action: Action.Split })
+                }
+              >
+                SPLIT
+              </button>
+            )}
           <br />
         </>
       );
@@ -459,18 +522,25 @@ export default function Blackjack() {
             game.dealerHole,
             game.dealerPocket
           )}`}</div>
-          {game.hands.map(({ cards }, index) => (
-            <div key={`${cards.toString()}|${index}`}>
-              <span>{`PLAYER CARDS: ${cards}`}</span>
-              <span>
-                {bestScore(cards) > dealerScore
-                  ? " - YOU WON"
-                  : dealerScore > bestScore(cards)
-                  ? " - YOU LOST"
-                  : " - PUSH"}
-              </span>
-            </div>
-          ))}
+          <div>
+            {game.hands.map((hand, index) => {
+              const { cards, bet } = hand;
+              return (
+                <div key={`${cards.toString()}|${index}`}>
+                  <Hand
+                    text={`PLAYER CARDS: ${cards} (${bet}) ${
+                      bestScore(cards) > dealerScore
+                        ? ` - ${isBlackJack(cards) ? "BLACKJACK" : "YOU WON"}`
+                        : dealerScore > bestScore(cards)
+                        ? " - YOU LOST"
+                        : " - PUSH"
+                    }`}
+                    active={hand === activeHand}
+                  />
+                </div>
+              );
+            })}
+          </div>
           <button onClick={() => dispatch({ type: "settle" })}>OK</button>
           <br />
           <br />
