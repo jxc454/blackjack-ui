@@ -1,88 +1,88 @@
-// import {
-//   Action,
-//   buildNewDeck,
-//   Game,
-//   GameState,
-//   getCountForGame,
-//   isBlackJack,
-//   reducer,
-//   bestScore,
-//   getCount,
-//   getScores
-// } from "./blackjack";
-// import {
-//   compact,
-//   concat,
-//   inRange,
-//   findIndex,
-//   max,
-//   mean,
-//   memoize,
-//   pullAt,
-//   range,
-//   round,
-//   shuffle
-// } from "lodash";
-//
-// export const alignDeckWithCount: (deck: number[], count: number) => number[] = (
-//   deck: number[],
-//   count: number
-// ) => {
-//   const newDeck: number[] = [];
-//   let currentCount = getCount(deck);
-//
-//   for (const card of deck) {
-//     if (currentCount === count) {
-//       newDeck.push(card);
-//     }
-//     if (currentCount < count) {
-//       if (card !== 10) {
-//         newDeck.push(card);
-//       } else {
-//         currentCount++;
-//       }
-//     }
-//     if (currentCount > count) {
-//       if (!inRange(card, 3, 7)) {
-//         newDeck.push(card);
-//       } else {
-//         currentCount--;
-//       }
-//     }
-//   }
-//   if (currentCount !== count) {
-//     console.error(deck);
-//     console.error(`desired count: ${count}`);
-//     console.error(`current count: ${currentCount}`);
-//     throw new Error("Could not align deck with count.");
-//   }
-//   return newDeck;
-// };
-//
-// export const dealCardsFromDeck: (deck: number[], cards: number[]) => number[] = (
-//   deck: number[],
-//   cards: number[]
-// ) => {
-//   const newDeck = [...deck];
-//   const indexesToRemove = cards.map(card => deck.indexOf(card));
-//
-//   pullAt(newDeck, indexesToRemove);
-//   return newDeck;
-// };
-//
-// export const addDealerCardNoBlackJack: (deck: number[], card: number) => [number[], number] = (
-//   deck: number[],
-//   card: number
-// ) => {
-//   const newDeck = shuffle([...deck]);
-//   const indexOfNextCard = findIndex(
-//     deck,
-//     innerCard => !isBlackJack(concat(innerCard, card))
-//   );
-//   const nextCard = pullAt(newDeck, indexOfNextCard)[0];
-//   return [compact(newDeck), nextCard];
-// };
-//
+import {
+  Action,
+  buildNewDeck,
+  Game,
+  GameState,
+  getCountForGame,
+  isBlackJack,
+  reducer,
+  bestScore,
+  getCount,
+  getScores
+} from "./blackjack";
+import {
+  compact,
+  concat,
+  inRange,
+  findIndex,
+  max,
+  mean,
+  memoize,
+  pullAt,
+  range,
+  round,
+  shuffle
+} from "lodash";
+
+export const alignDeckWithCount: (deck: number[], count: number) => number[] = (
+  deck: number[],
+  count: number
+) => {
+  const newDeck: number[] = [];
+  let currentCount = getCount(deck);
+
+  for (const card of deck) {
+    if (currentCount === count) {
+      newDeck.push(card);
+    }
+    if (currentCount < count) {
+      if (card !== 10) {
+        newDeck.push(card);
+      } else {
+        currentCount++;
+      }
+    }
+    if (currentCount > count) {
+      if (!inRange(card, 3, 7)) {
+        newDeck.push(card);
+      } else {
+        currentCount--;
+      }
+    }
+  }
+  if (currentCount !== count) {
+    console.error(deck);
+    console.error(`desired count: ${count}`);
+    console.error(`current count: ${currentCount}`);
+    throw new Error("Could not align deck with count.");
+  }
+  return newDeck;
+};
+
+export const dealCardsFromDeck: (deck: number[], cards: number[]) => number[] = (
+  deck: number[],
+  cards: number[]
+) => {
+  const newDeck = [...deck];
+  const indexesToRemove = cards.map(card => deck.indexOf(card));
+
+  pullAt(newDeck, indexesToRemove);
+  return newDeck;
+};
+
+export const addDealerCardNoBlackJack: (deck: number[], card: number) => [number[], number] = (
+  deck: number[],
+  card: number
+) => {
+  const newDeck = shuffle([...deck]);
+  const indexOfNextCard = findIndex(
+    deck,
+    innerCard => !isBlackJack(concat(innerCard, card))
+  );
+  const nextCard = pullAt(newDeck, indexOfNextCard)[0];
+  return [compact(newDeck), nextCard];
+};
+
 // const simulate: (
 //   count: number,
 //   playerCards: number[],
@@ -125,20 +125,20 @@
 //         );
 //
 //         if (newGameState.state == GameState.Settle) {
-//           // player wins
 //           if (
 //             !newGameState.dealerCards.length ||
 //             bestScore(newGameState.dealerCards) <
 //               bestScore(newGameState.playerCards)
 //           ) {
+//           // player wins
 //             return newGameState.bet * 2;
 //           }
-//           // player loses
 //           if (
 //             !newGameState.playerCards.length ||
 //             bestScore(newGameState.playerCards) <
 //               bestScore(newGameState.dealerCards)
 //           ) {
+//           // player loses
 //             return 0;
 //           }
 //           // push

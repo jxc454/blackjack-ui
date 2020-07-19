@@ -18,6 +18,7 @@ import {
 // import { Simulate } from "react-dom/test-utils";
 
 import Hand from "../app/components/Hand";
+import simulate2 from "./simulator2";
 
 export enum GameState {
   Bet,
@@ -203,6 +204,7 @@ export function reducer(game: Game, action: GameAction): Game {
         };
       }
       if (action.action === Action.DoubleDown) {
+        // FIXME - double down bug where a bust against a dealer bust is a push instead of a player loss
         // find first hand with PlayerAction
         const newHands = cloneDeep(game.hands);
         const newDeck = [...game.deck];
@@ -224,12 +226,7 @@ export function reducer(game: Game, action: GameAction): Game {
           ? HandStage.Settle
           : HandStage.Busted;
 
-        // total active hands remaining
-        const activeHands = newHands.some(
-          ({ stage }) => stage === HandStage.PlayerAction
-        );
-
-        if (activeHands) {
+        if (newHands.some(({ stage }) => stage === HandStage.PlayerAction)) {
           return {
             ...game,
             deck: newDeck,
@@ -450,13 +447,12 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
-      // const [hitOutcome, stayOutcome] = simulate(
-      //   getCountForGame(game),
-      //   activeHand.cards,
-      //   concat(game.dealerHole, game.dealerPocket)
-      // );
-
-      const [hitOutcome, stayOutcome] = [0, 0];
+      const {
+        hitOutcome,
+        stayOutcome,
+        splitOutcome,
+        doubleDownOutcome
+      } = simulate2(getCountForGame(game), activeHand.cards, game.dealerHole);
 
       return (
         <>
@@ -495,7 +491,7 @@ export default function Blackjack() {
                 dispatch({ type: "player", action: Action.DoubleDown })
               }
             >
-              DOUBLE
+              {`DOUBLE: ${doubleDownOutcome}`}
             </button>
           )}
           {activeHand?.cards.length === 2 &&
@@ -505,7 +501,7 @@ export default function Blackjack() {
                   dispatch({ type: "player", action: Action.Split })
                 }
               >
-                SPLIT
+                {`SPLIT: ${splitOutcome}`}
               </button>
             )}
           <br />
