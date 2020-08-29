@@ -1,7 +1,7 @@
 {
-  "name": "teamsui",
+  "name": "blackjack-ui",
   "version": "1.0.0",
-  "description": "ui for teams",
+  "description": "ui for blackjack",
   "main": "index.js",
   "scripts": {
     "watch": "webpack --watch",
