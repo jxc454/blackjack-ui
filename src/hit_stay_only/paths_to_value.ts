@@ -111,6 +111,24 @@ function dealersTurn(
 ): number {
   let all = [dealerStart];
   let score = getScore(all);
+  ``;
+  // if dealerStart is an ace, the first card can't be a 10
+  if (dealerStart === 1) {
+    const tens = deckMap.get(10);
+    deckMap.delete(10);
+    all.push(sampleMap(deckMap));
+    score = getScore(all);
+    deckMap.set(10, tens || 0);
+  }
+
+  // if dealerStart is a ten, the first card can't be an ace
+  if (dealerStart === 10) {
+    const aces = deckMap.get(1);
+    deckMap.delete(1);
+    all.push(sampleMap(deckMap));
+    score = getScore(all);
+    deckMap.set(1, aces || 0);
+  }
 
   while (score < 17) {
     // console.log(`dealerScore->${score}`);
@@ -131,7 +149,7 @@ function getStayEv(
   handValue: number,
   deckMap: Map<number, number>
 ): number {
-  const stayIterations = 2500;
+  const stayIterations = 10;
   let stayTotal = 0;
   for (const _ of range(0, stayIterations)) {
     const dealerValue = dealersTurn(dealerCard!, deckMap);
@@ -244,8 +262,9 @@ const deckDict = countBy(deck);
 const deckMap: Map<number, number> = new Map();
 
 Object.keys(deckDict).forEach(key => deckMap.set(parseInt(key), deckDict[key]));
-const eps = new Node();
+const evs = new Node();
 
+// hit ev
 handsMap.push(["0", [[]]]);
 for (const [_, hands] of handsMap) {
   // need to process all of these hands and get the EPs stored in the trie
@@ -280,7 +299,7 @@ for (const [_, hands] of handsMap) {
 
       if (bestPlayerHand < 21) {
         // look up this hand
-        const expectedHit = eps.findFinal(
+        const expectedHit = evs.findFinal(
           hand.concat(cardValue).sort((a, b) => b - a)
         )!;
         handHitEv += expectedHit * count;
@@ -297,7 +316,7 @@ for (const [_, hands] of handsMap) {
       deckMap
     );
 
-    eps.addPath(
+    evs.addPath(
       hand,
       Math.max(handHitEv / sum(Array.from(deckMap.values())), handStayEv)
     );
@@ -307,13 +326,29 @@ for (const [_, hands] of handsMap) {
   }
 }
 
+// stay ev
 const stayEv = getStayEv(dealerCard!, getScore(playerHand), deckMap);
+
+// double-down ev
+let ddEv = 0;
+Array.from(deckMap.entries()).forEach(([cardValue, count]) => {
+  const handValue = getScore(playerHand.concat(cardValue));
+  if (handValue > 21) {
+    ddEv -= 2 * count;
+    return;
+  }
+  deckMap.set(cardValue, deckMap.get(cardValue)! - 1);
+  ddEv += getStayEv(dealerCard!, handValue, deckMap) * 2 * count;
+  deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
+});
+
 console.log("stay", stayEv);
 console.log(
   "hit",
   sum(
     Array.from(deckMap.entries()).map(
-      ([cardValue, count]) => (eps.findFinal([cardValue]) || -1) * count
+      ([cardValue, count]) => (evs.findFinal([cardValue]) || -1) * count
     )
-  ) / sum(Array.from(deckMap.values()))
+  ) / deck.length
 );
+console.log("doubleDown", ddEv / deck.length);
