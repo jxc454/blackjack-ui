@@ -146,7 +146,14 @@ export function reducer(game: Game, action: GameAction): Game {
   switch (action.type) {
     case "bet":
       const deck =
-        game.deck.length > 10 ? [...game.deck] : shuffle(buildNewDeck());
+        game.deck.length > 15
+          ? [...game.deck]
+          : shuffle([
+              ...buildNewDeck(),
+              ...buildNewDeck(),
+              ...buildNewDeck(),
+              ...buildNewDeck()
+            ]);
 
       const playerCards = pullAt(deck, [0, 1]);
       const dealerCards = pullAt(deck, [0, 1]);

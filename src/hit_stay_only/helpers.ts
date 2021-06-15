@@ -1,7 +1,6 @@
 import { random, range, sum } from "lodash";
 
 export function getScore(cards: number[]): number {
-  // console.log(cards)
   const score1 = sum(cards);
   if (cards.includes(1)) {
     const score2 = score1 + 10;
@@ -91,15 +90,4 @@ export function getStayEv(
   }
 
   return stayTotal / stayIterations;
-}
-
-function removeFromDeck(remove: number[], deck: number[]): number[] {
-  remove.forEach(value => {
-    const i = deck.findIndex(d => d === value);
-    if (value > -1) {
-      deck.splice(i, 1);
-    }
-  });
-
-  return deck;
 }
