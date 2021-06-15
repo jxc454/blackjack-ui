@@ -1,7 +1,7 @@
 import { random, range, sum } from "lodash";
 
 export function getScore(cards: number[]): number {
-  console.log(cards)
+  // console.log(cards)
   const score1 = sum(cards);
   if (cards.includes(1)) {
     const score2 = score1 + 10;

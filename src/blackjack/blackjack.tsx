@@ -83,7 +83,12 @@ const initialState: Game = {
   hands: [],
   dealerHole: 0,
   dealerPocket: [],
-  deck: buildNewDeck(),
+  deck: [
+    ...buildNewDeck(),
+    ...buildNewDeck(),
+    ...buildNewDeck(),
+    ...buildNewDeck()
+  ],
   cash: 100
 };
 
@@ -129,8 +134,8 @@ export const dealerExecute: (
   const newDealerCards = [...dealerHand];
   const newDeck = [...deck];
   while (
-    (newDealerCards.length && max(getScores(newDealerCards))) ||
-    Infinity < 17
+    newDealerCards.length &&
+    (max(getScores(newDealerCards)) || Infinity) < 17
   ) {
     newDealerCards.push(pullAt(newDeck, 0)[0]);
   }

@@ -4,57 +4,96 @@ import { getScore, getStayEv } from "./helpers";
 
 // find all unique hands that could be dealt with these cards to the target value or less
 export function uniqueHands(cards: number[], target: number): number[][] {
-  if (!cards.length) {
-    return [];
-  }
-  if (cards.length === 1) {
-    return cards[0] === target ? [cards] : [];
-  }
+  const result: number[][] = Array(cards.length + 1).fill(null).map(() => [])
 
-  let state: Array<Node> = Array(target + 1)
-    .fill(null)
-    .map(() => new Node());
+  const map = new Map(
+      Array.from(cards
+          .reduce((acc, k) => acc.set(k, (acc.get(k) || 0) + 1), new Map())
+          .entries())
+          .sort((a, b) => b[0] - a[0])
+  )
 
-  for (let index = 0; index < cards.length; index++) {
-    const inputValue = cards[index];
-    if (inputValue > target) {
-      continue;
+  function dfs(cardsMap: Map<number, number>, soFar: number[], min: number): void {
+    if (!map.size) {
+      return
     }
 
-    const currentPaths = state.map(node => node.getAllPaths());
+    const soFarSum = soFar.reduce((acc, k) => acc + k, 0)
 
-    for (let capacity = state.length - 1; capacity >= 0; capacity--) {
-      if (capacity > inputValue) {
-        const existing = currentPaths[capacity - inputValue].map(arr =>
-          arr.reverse()
-        );
-
-        existing.forEach(path => {
-          state[capacity].addPath(path.concat(inputValue));
-        });
+    Array.from(cardsMap.entries()).forEach(([dfsCard, count]) => {
+      if (!count || dfsCard < min || soFarSum + dfsCard > target) {
+        return
       }
 
-      // handle soft hands
-      if (inputValue === 1 && capacity > 11) {
-        const existing = currentPaths[capacity - 11].map(arr => arr.reverse());
+      // push dfsCard to result
+      const next = [dfsCard].concat(soFar)
+      result.push(next)
 
-        existing.forEach(path => {
-          state[capacity].addPath(path.concat(1));
-        });
-      }
-    }
+      // decrement
+      cardsMap.set(dfsCard, cardsMap.get(dfsCard)! - 1)
 
-    state[inputValue].addPath([inputValue]);
+      dfs(cardsMap, [...next], dfsCard)
+
+      // increment
+      cardsMap.set(dfsCard, cardsMap.get(dfsCard)! + 1)
+    })
   }
 
-  const all = state[state.length - 1].getAllPaths();
-  const topNode = new Node();
-  all.forEach(path => {
-    path.sort((a, b) => a - b);
-    topNode.addPath(path);
-  });
+  dfs(map, [], 0)
 
-  return topNode.getAllPaths();
+  return result.filter(x => x.length)
+
+  // if (!cards.length) {
+  //   return [];
+  // }
+  // if (cards.length === 1) {
+  //   return cards[0] === target ? [cards] : [];
+  // }
+  //
+  // let state: Array<Node> = Array(target + 1)
+  //   .fill(null)
+  //   .map(() => new Node());
+  //
+  // for (let index = 0; index < cards.length; index++) {
+  //   const inputValue = cards[index];
+  //   if (inputValue > target) {
+  //     continue;
+  //   }
+  //
+  //   const currentPaths = state.map(node => node.getAllPaths());
+  //
+  //   for (let capacity = state.length - 1; capacity >= 0; capacity--) {
+  //     if (capacity > inputValue) {
+  //       const existing = currentPaths[capacity - inputValue].map(arr =>
+  //         arr.reverse()
+  //       );
+  //
+  //       existing.forEach(path => {
+  //         state[capacity].addPath(path.concat(inputValue));
+  //       });
+  //     }
+  //
+  //     // handle soft hands
+  //     if (inputValue === 1 && capacity > 11) {
+  //       const existing = currentPaths[capacity - 11].map(arr => arr.reverse());
+  //
+  //       existing.forEach(path => {
+  //         state[capacity].addPath(path.concat(1));
+  //       });
+  //     }
+  //   }
+  //
+  //   state[inputValue].addPath([inputValue]);
+  //   }
+  //
+  //   const all = state[state.length - 1].getAllPaths();
+  //   const topNode = new Node();
+  //   all.forEach(path => {
+  //     path.sort((a, b) => a - b);
+  //     topNode.addPath(path);
+  //   });
+  //
+  //   return topNode.getAllPaths();
 }
 
 // TODO - move this all to test
@@ -86,22 +125,24 @@ export function getOdds(
 
   const hands: number[][] = [];
   let total = 21;
-  while (total - sum(playerHand) > 0) {
+  // while (total - sum(playerHand) > 0) {
     hands.push(
       ...uniqueHands(
-        deck.sort((a, b) => b - a),
+        deck, //.sort((a, b) => b - a),
         total - sum(playerHand)
       )
     );
-    total--;
-  }
-  console.log(`possibilities -> ${flatMap(hands, x => x).length}`);
+    // total--;
+  // }
+  // console.log(`possibilities -> ${flatMap(hands, x => x).length}`);
 
   // array of tuples
   // [cardCount, Card[][]), sorted high-to-low by cardCount
   const handsMap: Array<[string, number[][]]> = toPairs(
     groupBy(hands, "length")
   ).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+
+  console.log(handsMap)
 
   // card value to frequency of card in deck
   const deckDict = countBy(deck);
@@ -199,5 +240,3 @@ export function getOdds(
     ddEv / deck.length
   ].map(n => round(n, 2)) as [number, number, number];
 }
-
-// V099052896
