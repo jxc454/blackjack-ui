@@ -1,3 +1,4 @@
+// ts-ignore
 import React, { useRef } from "react";
 
 export default function RefWorkout() {
@@ -16,8 +17,8 @@ export default function RefWorkout() {
   const focusInput = () => {
     count.current.value++;
     console.log(count.current.value);
-    h1.current.innerText = count.current.value.toString();
-    cb.current.focus();
+    h1.current!.innerText = count.current.value.toString();
+    cb.current?.focus();
   };
 
   return (

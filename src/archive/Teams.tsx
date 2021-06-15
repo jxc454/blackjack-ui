@@ -1,7 +1,7 @@
 import React, {useContext, useEffect, useState} from "react";
 import axios from "axios";
-import DenseTable from "./helpers/Table";
-import {TestContext} from "./index";
+import DenseTable from "../app/components/helpers/Table";
+import {TestContext} from "../app/components";
 
 interface Team {
     id: number;

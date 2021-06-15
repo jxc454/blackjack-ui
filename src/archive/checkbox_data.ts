@@ -1,4 +1,4 @@
-import { DataItem } from "../CheckBoxData";
+import { DataItem } from "./CheckBoxData";
 import { pullAt, range, remove } from "lodash";
 import * as faker from "faker";
 
@@ -18,6 +18,7 @@ function setChildren(node: DataItem, children: DataItem[], x = 0): boolean {
       const set = setChildren(child, children, x + 1);
       if (set) return true
     })
+    return false
   }
 }
 
@@ -34,7 +35,7 @@ export function fakeData(n: number): DataItem[] {
     const children = remove(nodes, (_, i) => i < count);
 
     if (nodes.length) {
-      const parent = pullAt(nodes, [0])[0];
+      const parent = pullAt(nodes, [0])[0] || { children: undefined };
       parent.children = children;
       nodes.push(parent);
     } else {

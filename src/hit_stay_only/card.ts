@@ -1,7 +1,11 @@
-import { flatMap, shuffle } from "lodash";
+import { flatMap } from "lodash";
 
 export class Card {
-  constructor(name: string, value: number) {}
+  constructor(name: string, value: number) {
+    this.name = name;
+    this.value = value;
+  }
+
   public name: string;
 
   public value: number;
@@ -24,7 +28,7 @@ export class Shoe {
     return pips.concat(faces).concat(aces);
   }
 
-  public cards: Card[];
+  public cards: Card[] = [];
 
   deal(n: number): Card[] {
     if (n > this.cards.length) {
@@ -33,7 +37,7 @@ export class Shoe {
 
     const result = [];
     while (result.length < n) {
-      result.push(this.cards.pop());
+      result.push(this.cards.pop()!);
     }
 
     return result;

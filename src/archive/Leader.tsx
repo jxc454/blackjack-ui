@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import DenseTable from "./helpers/Table";
+import DenseTable from "../app/components/helpers/Table";
 
 export default function Leader() {
   const [leader, setLeader] = useState(

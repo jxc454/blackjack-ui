@@ -1,6 +1,5 @@
 import {
   Action,
-  bestScore,
   buildNewDeck,
   dealerExecute,
   GameState,
@@ -47,14 +46,6 @@ describe("blackjack tests", () => {
   test("getScores handles busts", () => {
     expect(getScores([2, 10, 7, 1, 1])).toEqual([21]);
     expect(getScores([10, 10, 2])).toEqual([]);
-  });
-
-  test("score handles aces", () => {
-    expect(bestScore([2, 3, 1])).toBe(16);
-  });
-
-  test("score handles multiple aces", () => {
-    expect(bestScore([2, 3, 1, 1, 1, 1])).toBe(19);
   });
 
   test("isBlackJack returns true for blackjack", () => {

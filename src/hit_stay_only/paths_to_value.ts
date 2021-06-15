@@ -1,179 +1,8 @@
-import {
-  countBy,
-  flatMap,
-  flatten,
-  groupBy,
-  random,
-  range,
-  shuffle,
-  sum,
-  toPairs
-} from "lodash";
-import { Simulate } from "react-dom/test-utils";
-import play = Simulate.play;
+import { countBy, flatMap, groupBy, round, sum, toPairs } from "lodash";
+import Node from "./trie_node";
+import { getScore, getStayEv } from "./helpers";
 
-export class Node {
-  constructor(val?: number) {
-    this.val = val || -1;
-    this.children = null;
-  }
-  val: number;
-  children: Map<number, Node> | null;
-  final: number | undefined;
-
-  addPath(input: number[], final?: number): void {
-    if (!input.length) {
-      this.final = final;
-      return;
-    }
-    if (!this.children) {
-      this.children = new Map();
-    }
-    if (!this.children.has(input[0])) {
-      this.children.set(input[0], new Node(input[0]));
-    }
-    if (input.length === 1) {
-      this.children.get(input[0])!.final = final;
-    }
-
-    this.children.get(input[0])!.addPath(input.slice(1), final);
-  }
-
-  getAllPaths(): number[][] {
-    if (!this.children) {
-      return [];
-    }
-
-    const results: number[][] = [];
-    this.children.forEach((v, k) => {
-      const subPaths = v.getAllPaths();
-      if (!subPaths.length) {
-        results.push([k]);
-      } else {
-        subPaths.forEach(arr => arr.push(k));
-        results.push(...subPaths);
-      }
-    });
-
-    return results;
-  }
-
-  findFinal(path: number[]): number | undefined {
-    if (!path.length) {
-      return this.final;
-      // throw new Error("zero length path");
-    }
-    if (path.length === 1) {
-      return this.children?.get(path[0])?.final;
-    }
-
-    return this.children?.get(path[0])?.findFinal(path.slice(1));
-  }
-}
-
-function getScore(cards: number[]): number {
-  const score1 = sum(cards);
-  if (cards.includes(1)) {
-    const score2 = score1 + 10;
-
-    if (score1 === 21 || score2 === 21) {
-      return 21;
-    }
-
-    return Math.max(score1, score2 % 21);
-  }
-
-  return score1;
-}
-
-function sampleMap(map: Map<number, number>): number {
-  let total = 0;
-  map.forEach(v => (total += v));
-
-  const i = random(1, total);
-  let sum = 0;
-
-  const entries = Array.from(map.entries());
-  for (const [k, v] of entries) {
-    sum += v;
-    if (sum >= i) {
-      map.set(k, map.get(k)! - 1);
-      return k;
-    }
-  }
-
-  return -999;
-}
-
-function dealersTurn(
-  dealerStart: number,
-  deckMap: Map<number, number>
-): number {
-  let all = [dealerStart];
-  let score = getScore(all);
-  ``;
-  // if dealerStart is an ace, the first card can't be a 10
-  if (dealerStart === 1) {
-    const tens = deckMap.get(10);
-    deckMap.delete(10);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-    deckMap.set(10, tens || 0);
-  }
-
-  // if dealerStart is a ten, the first card can't be an ace
-  if (dealerStart === 10) {
-    const aces = deckMap.get(1);
-    deckMap.delete(1);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-    deckMap.set(1, aces || 0);
-  }
-
-  while (score < 17) {
-    // console.log(`dealerScore->${score}`);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-  }
-
-  // replace cards
-  for (let i = 1; i < all.length; i++) {
-    deckMap.set(all[i], deckMap.get(all[i])! + 1);
-  }
-
-  return score;
-}
-
-function getStayEv(
-  dealerStart: number,
-  handValue: number,
-  deckMap: Map<number, number>
-): number {
-  const stayIterations = 10;
-  let stayTotal = 0;
-  for (const _ of range(0, stayIterations)) {
-    const dealerValue = dealersTurn(dealerCard!, deckMap);
-    if (dealerValue > 21 || handValue > dealerValue) {
-      stayTotal++;
-    } else if (dealerValue > handValue) {
-      stayTotal--;
-    }
-  }
-
-  return stayTotal / stayIterations;
-}
-
-function removeFromDeck(remove: number[], deck: number[]): number[] {
-  remove.forEach(value => {
-    const i = deck.findIndex(d => d === value);
-    if (value > -1) {
-      deck.splice(i, 1);
-    }
-  });
-
-  return deck;
-}
-
+// find all unique hands that could be dealt with these cards to the target value or less
 export function uniqueHands(cards: number[], target: number): number[][] {
   if (!cards.length) {
     return [];
@@ -228,127 +57,147 @@ export function uniqueHands(cards: number[], target: number): number[][] {
   return topNode.getAllPaths();
 }
 
-const deckPart = shuffle(
-  flatMap([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10], card =>
-    Array(4).fill(card)
-  )
-);
+// TODO - move this all to test
+// const deckPart = flatMap([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10], card =>
+//   Array(4).fill(card)
+// );
+//
+// const deck = shuffle([
+//   ...deckPart,
+//   ...deckPart,
+//   ...deckPart,
+//   ...deckPart,
+//   ...deckPart,
+//   ...deckPart
+// ]);
 
-const deck = removeFromDeck([1, 10, 9], [...deckPart, ...deckPart]);
+// const playerHand: number[] = [deck.pop()!, deck.pop()!];
+// const dealerCard = deck.pop();
+// console.log(dealerCard);
+// console.log(playerHand);
 
-const playerHand: number[] = [deck.pop()!, deck.pop()!];
-const dealerCard = deck.pop();
-// const playerHand = [10, 9];
-// const dealerCard = 1;
-console.log(dealerCard);
-console.log(playerHand);
+export function getOdds(
+  deckInput: number[],
+  playerCards: number[],
+  dealerCard: number
+): [number, number, number] {
+  const deck = [...deckInput];
+  const playerHand = [...playerCards];
 
-const hands: number[][] = [];
+  const hands: number[][] = [];
+  let total = 21;
+  while (total - sum(playerHand) > 0) {
+    hands.push(
+      ...uniqueHands(
+        deck.sort((a, b) => b - a),
+        total - sum(playerHand)
+      )
+    );
+    total--;
+  }
+  console.log(`possibilities -> ${flatMap(hands, x => x).length}`);
 
-let total = 21;
-while (total - sum(playerHand) > 0) {
-  hands.push(...uniqueHands(deck, total - sum(playerHand)));
-  total--;
-}
+  // array of tuples
+  // [cardCount, Card[][]), sorted high-to-low by cardCount
+  const handsMap: Array<[string, number[][]]> = toPairs(
+    groupBy(hands, "length")
+  ).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
 
-// array of tuples
-// [cardCount, Card[][]), sorted high-to-low by cardCount
-const handsMap: Array<[string, number[][]]> = toPairs(
-  groupBy(hands, "length")
-).sort((a, b) => parseInt(b[0]) - parseInt(a[0]));
+  // card value to frequency of card in deck
+  const deckDict = countBy(deck);
+  const deckMap: Map<number, number> = new Map();
 
-// card value to frequency of card in deck
-const deckDict = countBy(deck);
-const deckMap: Map<number, number> = new Map();
+  Object.keys(deckDict).forEach(key =>
+    deckMap.set(parseInt(key), deckDict[key])
+  );
+  const evs = new Node();
 
-Object.keys(deckDict).forEach(key => deckMap.set(parseInt(key), deckDict[key]));
-const evs = new Node();
+  // hit ev
+  handsMap.push(["0", [[]]]);
+  for (const [_, hands] of handsMap) {
+    // need to process all of these hands and store the expected values in the trie
+    for (const hand of hands) {
+      // decrement the deck with the values in this hand
+      hand.forEach(card => deckMap.set(card, deckMap.get(card)! - 1));
 
-// hit ev
-handsMap.push(["0", [[]]]);
-for (const [_, hands] of handsMap) {
-  // need to process all of these hands and get the EPs stored in the trie
-  for (const hand of hands) {
-    // decrement the deck with the values in this hand
-    hand.forEach(card => deckMap.set(card, deckMap.get(card)! - 1));
+      let handHitEv = 0;
 
-    let handHitEv = 0;
+      // this is how we get the expected values for each hand
+      deckMap.forEach((count, cardValue) => {
+        if (count <= 0) {
+          // there aren't actually any instance of this card in the deck, so skip this case
+          return;
+        }
+        // add this card to the original hand, plus the hand here
+        const allCards = hand.concat(playerHand).concat(cardValue);
 
-    // now it's like we dealt this hand for real
-    // now deal each distinct card in the deck and see how we do
-    // this is how we get the HIT values
-    deckMap.forEach((count, cardValue) => {
-      if (count <= 0) {
-        // there aren't actually any instance of this card in the deck, so skip this case
-        return;
-      }
-      // add this card to the original hand, plus the hand here
-      const allCards = hand.concat(playerHand).concat(cardValue);
+        // remove this card from the deck
+        deckMap.set(cardValue, deckMap.get(cardValue)! - 1);
 
-      // remove this card from the deck
-      deckMap.set(cardValue, deckMap.get(cardValue)! - 1);
+        const bestPlayerHand = getScore(allCards);
 
-      const bestPlayerHand = getScore(allCards);
+        if (bestPlayerHand > 21) {
+          // bust!  no need for dealer to do anything, just put the card back
+          deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
+          handHitEv += -1 * count;
+          return;
+        }
 
-      if (bestPlayerHand > 21) {
-        // bust!  no need for dealer to do anything, just put the card back
+        if (bestPlayerHand < 21) {
+          // look up this hand
+          const expectedHit = evs.findFinal(
+            hand.concat(cardValue).sort((a, b) => b - a)
+          )!;
+          handHitEv += expectedHit * count;
+        }
+
+        // put the card back
         deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
-        handHitEv += -1 * count;
-        return;
-      }
+      });
 
-      if (bestPlayerHand < 21) {
-        // look up this hand
-        const expectedHit = evs.findFinal(
-          hand.concat(cardValue).sort((a, b) => b - a)
-        )!;
-        handHitEv += expectedHit * count;
-      }
+      // now calculate the STAY percentage
+      const handStayEv = getStayEv(
+        dealerCard!,
+        getScore(hand.concat(playerHand)),
+        deckMap
+      );
 
-      // put the card back
-      deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
-    });
+      evs.addPath(
+        hand,
+        Math.max(handHitEv / sum(Array.from(deckMap.values())), handStayEv)
+      );
 
-    // now calculate the STAY percentage
-    const handStayEv = getStayEv(
-      dealerCard!,
-      getScore(hand.concat(playerHand)),
-      deckMap
-    );
-
-    evs.addPath(
-      hand,
-      Math.max(handHitEv / sum(Array.from(deckMap.values())), handStayEv)
-    );
-
-    // put the hand cards back
-    hand.forEach(card => deckMap.set(card, deckMap.get(card)! + 1));
+      // put the hand cards back
+      hand.forEach(card => deckMap.set(card, deckMap.get(card)! + 1));
+    }
   }
+
+  // stay ev
+  const stayEv = getStayEv(dealerCard!, getScore(playerHand), deckMap);
+
+  // double-down ev
+  let ddEv = 0;
+  Array.from(deckMap.entries()).forEach(([cardValue, count]) => {
+    const handValue = getScore(playerHand.concat(cardValue));
+    if (handValue > 21) {
+      ddEv -= 2 * count;
+      return;
+    }
+    deckMap.set(cardValue, deckMap.get(cardValue)! - 1);
+    ddEv += getStayEv(dealerCard!, handValue, deckMap) * 2 * count;
+    deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
+  });
+
+  // return [stay, hit, double down]
+  return [
+    stayEv,
+    sum(
+      Array.from(deckMap.entries()).map(
+        ([cardValue, count]) => (evs.findFinal([cardValue]) || -1) * count
+      )
+    ) / deck.length,
+    ddEv / deck.length
+  ].map(n => round(n, 2)) as [number, number, number];
 }
 
-// stay ev
-const stayEv = getStayEv(dealerCard!, getScore(playerHand), deckMap);
-
-// double-down ev
-let ddEv = 0;
-Array.from(deckMap.entries()).forEach(([cardValue, count]) => {
-  const handValue = getScore(playerHand.concat(cardValue));
-  if (handValue > 21) {
-    ddEv -= 2 * count;
-    return;
-  }
-  deckMap.set(cardValue, deckMap.get(cardValue)! - 1);
-  ddEv += getStayEv(dealerCard!, handValue, deckMap) * 2 * count;
-  deckMap.set(cardValue, deckMap.get(cardValue)! + 1);
-});
-
-console.log("stay", stayEv);
-console.log(
-  "hit",
-  sum(
-    Array.from(deckMap.entries()).map(
-      ([cardValue, count]) => (evs.findFinal([cardValue]) || -1) * count
-    )
-  ) / deck.length
-);
-console.log("doubleDown", ddEv / deck.length);
+// V099052896

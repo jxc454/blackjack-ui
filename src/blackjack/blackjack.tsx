@@ -2,6 +2,7 @@ import React, { useReducer } from "react";
 import {
   cloneDeep,
   concat,
+  countBy,
   flatMap,
   head,
   inRange,
@@ -14,11 +15,9 @@ import {
   tail,
   uniq
 } from "lodash";
-// import simulate from "./simulator";
-// import { Simulate } from "react-dom/test-utils";
 
 import Hand from "../app/components/Hand";
-import simulate2 from "./simulator2";
+import { getOdds } from "../hit_stay_only/paths_to_value";
 
 export enum GameState {
   Bet,
@@ -46,7 +45,7 @@ export interface Hand {
 }
 
 export interface Game {
-  dealerHole: number | undefined;
+  dealerHole: number;
   dealerPocket: number[];
   state: GameState;
   hands: Hand[];
@@ -82,7 +81,7 @@ export const buildNewDeck: () => number[] = () =>
 const initialState: Game = {
   state: GameState.Bet,
   hands: [],
-  dealerHole: undefined,
+  dealerHole: 0,
   dealerPocket: [],
   deck: buildNewDeck(),
   cash: 100
@@ -129,7 +128,10 @@ export const dealerExecute: (
 ) => [number[], number[]] = (deck: number[], dealerHand: number[]) => {
   const newDealerCards = [...dealerHand];
   const newDeck = [...deck];
-  while (newDealerCards.length && max(getScores(newDealerCards)) < 17) {
+  while (
+    (newDealerCards.length && max(getScores(newDealerCards))) ||
+    Infinity < 17
+  ) {
     newDealerCards.push(pullAt(newDeck, 0)[0]);
   }
   return [newDeck, newDealerCards];
@@ -154,7 +156,7 @@ export function reducer(game: Game, action: GameAction): Game {
             stage: HandStage.PlayerAction
           }
         ],
-        dealerHole: head(dealerCards),
+        dealerHole: head(dealerCards) || 0,
         dealerPocket: tail(dealerCards),
         state:
           isBlackJack(playerCards) || isBlackJack(dealerCards)
@@ -363,7 +365,7 @@ export function reducer(game: Game, action: GameAction): Game {
       const baseNewGame: Game = {
         ...game,
         hands: [],
-        dealerHole: undefined,
+        dealerHole: 0,
         dealerPocket: [],
         state: GameState.Bet
       };
@@ -395,7 +397,7 @@ export function reducer(game: Game, action: GameAction): Game {
       return {
         ...game,
         hands: [],
-        dealerHole: undefined,
+        dealerHole: 0,
         dealerPocket: [],
         state: GameState.Bet,
         cash:
@@ -419,6 +421,8 @@ export function reducer(game: Game, action: GameAction): Game {
           )
       };
   }
+
+  throw new Error();
 }
 
 export default function Blackjack() {
@@ -447,12 +451,11 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
-      const {
-        hitOutcome,
-        stayOutcome,
-        splitOutcome,
-        doubleDownOutcome
-      } = simulate2(getCountForGame(game), activeHand.cards, game.dealerHole);
+      const [stayOutcome, hitOutcome, doubleDownOutcome] = getOdds(
+        game.deck,
+        activeHand?.cards || [],
+        game.dealerHole
+      );
 
       return (
         <>
@@ -501,7 +504,7 @@ export default function Blackjack() {
                   dispatch({ type: "player", action: Action.Split })
                 }
               >
-                {`SPLIT: ${splitOutcome}`}
+                {`SPLIT: ?`}
               </button>
             )}
           <br />
@@ -538,6 +541,7 @@ export default function Blackjack() {
             })}
           </div>
           <button onClick={() => dispatch({ type: "settle" })}>OK</button>
+          <div>{JSON.stringify(countBy(game.deck))}</div>
           <br />
           <br />
         </>

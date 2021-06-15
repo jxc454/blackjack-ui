@@ -1,7 +1,7 @@
 import React, { ReactElement, useState } from "react";
 import CheckBoxTree from "./CheckBoxTree";
 import { get, set } from "lodash";
-import {fakeData} from "./helpers/checkbox_data";
+import {fakeData} from "./checkbox_data";
 
 export interface DataItem {
   label: string;
