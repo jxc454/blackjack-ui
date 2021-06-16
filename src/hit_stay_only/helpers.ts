@@ -1,4 +1,4 @@
-import { random, range, sum } from "lodash";
+import { sum } from "lodash";
 
 export function getScore(cards: number[]): number {
   const score1 = sum(cards);
@@ -15,79 +15,67 @@ export function getScore(cards: number[]): number {
   return score1;
 }
 
-export function sampleMap(map: Map<number, number>): number {
-  let total = 0;
-  map.forEach(v => (total += v));
-
-  const i = random(1, total);
-  let sum = 0;
-
-  const entries = Array.from(map.entries());
-  for (const [k, v] of entries) {
-    sum += v;
-    if (sum >= i) {
-      map.set(k, map.get(k)! - 1);
-      return k;
-    }
-  }
-
-  return -999;
-}
-
-export function dealersTurn(
-  dealerStart: number,
-  deckMap: Map<number, number>
-): number {
-  let all = [dealerStart];
-  let score = getScore(all);
-  ``;
-  // if dealerStart is an ace, the first card can't be a 10
-  if (dealerStart === 1) {
-    const tens = deckMap.get(10);
-    deckMap.delete(10);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-    deckMap.set(10, tens || 0);
-  }
-
-  // if dealerStart is a ten, the first card can't be an ace
-  if (dealerStart === 10) {
-    const aces = deckMap.get(1);
-    deckMap.delete(1);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-    deckMap.set(1, aces || 0);
-  }
-
-  while (score < 17) {
-    // console.log(`dealerScore->${score}`);
-    all.push(sampleMap(deckMap));
-    score = getScore(all);
-  }
-
-  // replace cards
-  for (let i = 1; i < all.length; i++) {
-    deckMap.set(all[i], deckMap.get(all[i])! + 1);
-  }
-
-  return score;
-}
-
 export function getStayEv(
   dealerStart: number,
   handValue: number,
   deckMap: Map<number, number>
 ): number {
-  const stayIterations = 250;
-  let stayTotal = 0;
-  for (const _ of range(0, stayIterations)) {
-    const dealerValue = dealersTurn(dealerStart!, deckMap);
-    if (dealerValue > 21 || handValue > dealerValue) {
-      stayTotal++;
-    } else if (dealerValue > handValue) {
-      stayTotal--;
+  function stay(
+    curr: number[],
+    deckMap: Map<number, number>,
+    min: number
+  ): number {
+    const currSum = sum(curr);
+    if (currSum > 21) {
+      return 1;
     }
+
+    const score = Math.max(
+      currSum,
+      curr.includes(1) ? (currSum + 10) % 21 : -Infinity
+    );
+
+    if (score >= 17) {
+      return Math.min(score > handValue ? -1 : handValue > score ? 1 : 0);
+    }
+
+    let ev = 0;
+    let totalCards = 0;
+
+    // get all possible card values, recurse for each one
+    deckMap.forEach((count, card) => {
+      if (card < min || !count) {
+        return;
+      }
+
+      // decrement, add card
+      deckMap.set(card, count - 1);
+      curr.push(card);
+
+      ev += count * stay(curr, deckMap, min);
+      totalCards += count;
+
+      // increment
+      deckMap.set(card, count);
+      curr.pop();
+    });
+
+    return totalCards ? ev / totalCards : 0;
   }
 
-  return stayTotal / stayIterations;
+  const defer: Array<() => void> = [];
+
+  if (dealerStart === 10) {
+    const curr = deckMap.get(1)!;
+    deckMap.set(1, 0);
+    defer.push(() => deckMap.set(1, curr));
+  } else if (dealerStart === 1) {
+    const curr = deckMap.get(10)!;
+    deckMap.set(10, 0);
+    defer.push(() => deckMap.set(10, curr));
+  }
+
+  const answer = stay([dealerStart], deckMap, 1);
+  defer.forEach(fn => fn());
+  return answer;
 }

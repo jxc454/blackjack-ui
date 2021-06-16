@@ -463,11 +463,12 @@ export default function Blackjack() {
         </>
       );
     case GameState.PlayerAction:
-      const [stayOutcome, hitOutcome, doubleDownOutcome] = getOdds(
-        game.deck,
-        activeHand?.cards || [],
-        game.dealerHole
-      );
+      const [
+        stayOutcome,
+        hitOutcome,
+        doubleDownOutcome,
+        splitOutcome
+      ] = getOdds(game.deck, activeHand?.cards || [], game.dealerHole);
 
       return (
         <>
@@ -516,7 +517,7 @@ export default function Blackjack() {
                   dispatch({ type: "player", action: Action.Split })
                 }
               >
-                {`SPLIT: ?`}
+                {`SPLIT: ${splitOutcome}`}
               </button>
             )}
           <br />

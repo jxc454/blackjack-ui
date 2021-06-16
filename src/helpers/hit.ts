@@ -1,8 +1,8 @@
 // array of tuples
 // [cardCount, Card[][]), sorted high-to-low by cardCount
-import { countBy, groupBy, sum, toPairs } from "lodash";
+import { groupBy, sum, toPairs } from "lodash";
 import Node from "../hit_stay_only/trie_node";
-import { getScore, getStayEv } from "../hit_stay_only/helpers";
+import {getScore, getStayEv} from "../hit_stay_only/helpers";
 
 export interface hitParams {
   hands: number[][];
