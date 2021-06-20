@@ -26,6 +26,10 @@ export function getStayEv(
     min: number
   ): number {
     const currSum = sum(curr);
+    if (handValue > 21) {
+      return -1
+    }
+
     if (currSum > 21) {
       return 1;
     }
@@ -66,11 +70,11 @@ export function getStayEv(
   const defer: Array<() => void> = [];
 
   if (dealerStart === 10) {
-    const curr = deckMap.get(1)!;
+    const curr = deckMap.get(1) || 0;
     deckMap.set(1, 0);
     defer.push(() => deckMap.set(1, curr));
   } else if (dealerStart === 1) {
-    const curr = deckMap.get(10)!;
+    const curr = deckMap.get(10) || 0;
     deckMap.set(10, 0);
     defer.push(() => deckMap.set(10, curr));
   }
