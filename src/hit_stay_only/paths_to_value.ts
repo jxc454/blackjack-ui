@@ -3,7 +3,6 @@ import { getScore, getStayEv } from "./helpers";
 import { hit } from "../algorithms/hit";
 import { bestScore } from "../blackjack/blackjack";
 import { split } from "../algorithms/split";
-import {stringifyMap} from "../helpers/helpers";
 
 // find all unique hands that could be dealt with these cards to the target value or less
 export function getOdds(

@@ -31,12 +31,8 @@ function getOddsMultipleHands({
 }: getOdds2HandsParams): number {
   const sortedPlayerHand = [...playerHand].sort((a, b) => a - b);
   const cached = dp.get(stringifyMap(deckMap))?.findFinal(sortedPlayerHand);
-  // console.log(cached);
   if (cached !== undefined) {
-    // console.log("HIT CACHE", stringifyMap(deckMap), sortedPlayerHand, cached);
     return cached;
-  } else {
-    // console.log("NO CACHE", stringifyMap(deckMap), sortedPlayerHand, cached);
   }
 
   if (!next) {
@@ -94,13 +90,6 @@ function getOddsMultipleHands({
         2 *
         getStayEv(dealerCard, getScore(playerHand.concat(cardValue)), deckMap);
 
-      // console.log(
-      //   "ddOdds",
-      //   playerHand.concat(cardValue),
-      //   getScore(playerHand.concat(cardValue)),
-      //   getStayEv(dealerCard, getScore(playerHand.concat(cardValue)), deckMap)
-      // );
-
       // calculate best second-hand since we stopped here with first hand
       let secondEv = split({
         playerHand: playerHand.slice(0, 1),
@@ -118,6 +107,7 @@ function getOddsMultipleHands({
     });
     ddEv /= deck.length;
 
+    // TODO this enables re-splitting, but it's too expensive
     // if (playerHand[0] === playerHand[1] && next < 1) {
     //   splitEv = 0;
     //   // for split call split, with next + 1
@@ -159,9 +149,6 @@ function getOddsMultipleHands({
     deckMap.set(cardValue, count);
   });
   hitEv /= deck.length;
-
-  // console.log(playerHand, deck.length);
-  // console.log("HITEV", hitEv);
 
   const key = stringifyMap(deckMap);
   if (!dp.has(key)) {
