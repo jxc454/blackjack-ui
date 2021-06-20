@@ -1,6 +1,7 @@
 import { getOdds } from "../hit_stay_only/paths_to_value";
 import { getScore, getStayEv } from "../hit_stay_only/helpers";
 import Node from "../hit_stay_only/trie_node";
+import { stringifyMap } from "../helpers/helpers";
 
 export interface splitParams {
   deck: number[];
@@ -29,58 +30,50 @@ function getOddsMultipleHands({
   next
 }: getOdds2HandsParams): number {
   const sortedPlayerHand = [...playerHand].sort((a, b) => a - b);
-  const cached = dp.get(deckMap.toString())?.findFinal(sortedPlayerHand);
+  const cached = dp.get(stringifyMap(deckMap))?.findFinal(sortedPlayerHand);
   // console.log(cached);
   if (cached !== undefined) {
-      console.log('HIT CACHE', deckMap.toString(), sortedPlayerHand, cached)
+    // console.log("HIT CACHE", stringifyMap(deckMap), sortedPlayerHand, cached);
     return cached;
+  } else {
+    // console.log("NO CACHE", stringifyMap(deckMap), sortedPlayerHand, cached);
   }
 
   if (!next) {
-    const key = deckMap.toString();
+    const key = stringifyMap(deckMap);
     if (!dp.has(key)) {
       dp.set(key, new Node(-1));
     }
-    const best = Math.max(...getOdds(deck, playerHand, dealerCard));
+    if (dp.get(key)!.findFinal(sortedPlayerHand) !== undefined) {
+        console.log('CACHE HIT')
+        return dp.get(key)!.findFinal(sortedPlayerHand)!
+    }
+
+    const best = Math.max(...getOdds(deck, playerHand, dealerCard, false));
     dp.get(key)!.addPath(sortedPlayerHand, best);
     return best;
   }
 
   if (getScore(playerHand) > 21) {
-    return 0;
+    return -1;
   }
-
-  console.log(playerHand, deck.length);
 
   const deckCopy = [...deck];
 
   // calculate best second-hand if we stop here with first hand
-  let secondEv = 0;
-  let totalCards = 0;
-  deckMap.forEach((count, cardValue) => {
-    // remove current card from deck
-    const cardIndex = deckCopy.findIndex(v => v === cardValue)!;
-    deckCopy.splice(cardIndex, 1);
-    deckMap.set(cardValue, count - 1);
-
-    secondEv += getOddsMultipleHands({
-      playerHand: playerHand.concat(cardValue),
-      dealerCard,
-      deckMap,
-      deck,
-      next: next - 1
-    });
-    totalCards += count;
-
-    // put card back in to the deck
-    deckCopy.push(cardValue);
-    deckMap.set(cardValue, count);
+  let secondEv = split({
+    playerHand: playerHand.slice(0, 1),
+    dealerCard,
+    deckMap,
+    deck,
+    next: next - 1
   });
 
   // stayEv means no more cards for the current hand, plus the best we can do on the rest of the hands
   const stayEv =
-    getStayEv(dealerCard, getScore(playerHand), deckMap) +
-    secondEv / totalCards;
+    getStayEv(dealerCard, getScore(playerHand), deckMap) + secondEv;
+
+  // console.log("stayEv", stayEv);
 
   let ddEv = -Infinity;
   let splitEv = -Infinity;
@@ -101,33 +94,41 @@ function getOddsMultipleHands({
         2 *
         getStayEv(dealerCard, getScore(playerHand.concat(cardValue)), deckMap);
 
+      // console.log(
+      //   "ddOdds",
+      //   playerHand.concat(cardValue),
+      //   getScore(playerHand.concat(cardValue)),
+      //   getStayEv(dealerCard, getScore(playerHand.concat(cardValue)), deckMap)
+      // );
+
       // calculate best second-hand since we stopped here with first hand
       let secondEv = split({
         playerHand: playerHand.slice(0, 1),
         dealerCard,
         deckMap,
-        deck,
+        deck: deckCopy,
         next: next - 1
       });
       ddOdds += secondEv;
-      ddEv += ddOdds / count;
+      ddEv += ddOdds * count;
 
       // put card back in to the deck
       deckCopy.push(cardValue);
       deckMap.set(cardValue, count);
     });
+    ddEv /= deck.length;
 
-    if (playerHand[0] === playerHand[1] && next < 1) {
-      splitEv = 0;
-      // for split call split, with next + 1
-      splitEv += split({
-        playerHand: playerHand.slice(0, 1),
-        dealerCard,
-        deckMap,
-        deck,
-        next: next + 1
-      });
-    }
+    // if (playerHand[0] === playerHand[1] && next < 1) {
+    //   splitEv = 0;
+    //   // for split call split, with next + 1
+    //   splitEv += split({
+    //     playerHand: playerHand.slice(0, 1),
+    //     dealerCard,
+    //     deckMap,
+    //     deck,
+    //     next: next + 1
+    //   });
+    // }
   }
 
   let hitEv = 0;
@@ -151,14 +152,18 @@ function getOddsMultipleHands({
         deckMap,
         deck,
         next
-      }) / count;
+      }) * count;
 
     // put card back in to the deck
     deckCopy.push(cardValue);
     deckMap.set(cardValue, count);
   });
+  hitEv /= deck.length;
 
-  const key = deckMap.toString();
+  // console.log(playerHand, deck.length);
+  // console.log("HITEV", hitEv);
+
+  const key = stringifyMap(deckMap);
   if (!dp.has(key)) {
     dp.set(key, new Node(-1));
   }

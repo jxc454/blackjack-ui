@@ -47,7 +47,7 @@ export default class Node {
   findFinal(path: number[]): number | undefined {
     if (!path.length) {
       return this.final;
-      // throw new Error("zero length path");
+      throw new Error("zero length path");
     }
     if (path.length === 1) {
       return this.children?.get(path[0])?.final;

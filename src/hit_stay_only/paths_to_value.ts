@@ -1,69 +1,45 @@
-import { countBy, round, shuffle, sum } from "lodash";
+import { countBy, round, sum } from "lodash";
 import { getScore, getStayEv } from "./helpers";
-import { uniqueHands } from "../helpers/unique_hands";
-import { hit } from "../helpers/hit";
+import { hit } from "../algorithms/hit";
 import { bestScore } from "../blackjack/blackjack";
+import { split } from "../algorithms/split";
+import {stringifyMap} from "../helpers/helpers";
 
 // find all unique hands that could be dealt with these cards to the target value or less
 export function getOdds(
   deckInput: number[],
   playerCards: number[],
   dealerCard: number,
-  splitDepth: number = 2
+  splitOk: boolean = true
 ): [number, number, number, number] {
-  if (bestScore(playerCards) === 21) {
+  if (bestScore(playerCards) === 21 && playerCards.length === 2) {
     return [1.5, 0, 0, 0];
   }
 
   const deck = [...deckInput];
   const playerHand = [...playerCards];
 
-  const hands: number[][] = [];
-  let total = 21;
-  hands.push(...uniqueHands(deck, total - sum(playerHand)));
-
   // card value to frequency of card in deck
   const deckDict = countBy(deck);
   const deckMap: Map<number, number> = new Map();
+
   Object.keys(deckDict).forEach(key =>
     deckMap.set(parseInt(key), deckDict[key])
   );
+  // console.log(playerCards, deckInput.length, stringifyMap(deckMap));
 
-  let splitEv = 0;
+  const hitEv = hit({ deck, deckMap, playerHand, dealerCard });
 
-  if (playerCards[0] === playerCards[1] && splitDepth) {
-    // split is legal
-    const iterations = 30;
-    let evTotal = 0;
-
-    for (let i = 0; i < iterations; i++) {
-      const splitDeck = shuffle(deck);
-      const first = splitDeck.pop()!;
-      const firstEv = getOdds(
-        [...splitDeck],
-        [playerCards[0], first],
-        dealerCard,
-        splitDepth - 1
-      );
-
-      const second = splitDeck.pop()!;
-      const secondEv = getOdds(
-        [...splitDeck],
-        [playerCards[1], second],
-        dealerCard,
-        splitDepth - 1
-      );
-
-      // console.log(firstEv);
-      // console.log(secondEv);
-
-      splitDeck.push(second, first);
-      evTotal = evTotal + Math.max(...firstEv) + Math.max(...secondEv);
-    }
-    splitEv = evTotal / iterations;
-  }
-
-  const hitEv = hit({ hands, deck, playerHand, dealerCard, deckMap });
+  const splitEv =
+    playerCards[0] === playerCards[1] && splitOk
+      ? split({
+          playerHand: [playerHand[0]],
+          dealerCard,
+          deck,
+          deckMap,
+          next: 1
+        })
+      : -Infinity;
 
   // stay ev
   const stayEv = getStayEv(dealerCard!, getScore(playerHand), deckMap);
