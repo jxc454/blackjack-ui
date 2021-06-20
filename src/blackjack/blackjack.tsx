@@ -455,7 +455,7 @@ export default function Blackjack() {
         stayOutcome,
         hitOutcome,
         doubleDownOutcome,
-        splitOutcome
+        splitOutcome,
       ] = getOdds(game.deck, activeHand?.cards || [], game.dealerHole);
 
       return (
