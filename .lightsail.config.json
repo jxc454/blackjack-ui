@@ -1,0 +1,23 @@
+{
+  "containerServices": [
+    {
+      "containerServiceName": "blackjack-ui",
+      "arn": "arn:aws:lightsail:us-east-1:767724750718:ContainerService/b59107e4-7c9a-4117-9a3a-efc183b1a189",
+      "createdAt": "2021-06-20T19:53:47-04:00",
+      "location": {
+        "availabilityZone": "all",
+        "regionName": "us-east-1"
+      },
+      "resourceType": "ContainerService",
+      "tags": [],
+      "power": "nano",
+      "powerId": "nano-1",
+      "state": "READY",
+      "scale": 1,
+      "isDisabled": false,
+      "principalArn": "arn:aws:iam::101091991903:role/amazon/lightsail/us-east-1/containers/blackjack-ui/e1mtud3h9o08kqfa2lcd8oq3qh49veimn71nhdrmko4o5m3vmvv0",
+      "privateDomainName": "blackjack-ui.service.local",
+      "url": "https://blackjack-ui.obcbo8ipgh8kg.us-east-1.cs.amazonlightsail.com/"
+    }
+  ]
+}
