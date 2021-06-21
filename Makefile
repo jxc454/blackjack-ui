@@ -1,15 +1,32 @@
 COMMIT=$(shell git rev-parse --short=7 HEAD)
-ECR=$(shell aws sts get-caller-identity --query Account --output text)
+ACCT=$(shell aws sts get-caller-identity --query Account --output text)
+SERVICE="blackjack-ui"
 
 .PHONY: build
 build:
 	npm run build && docker build \
-		-t $(ECR).dkr.ecr.us-east-1.amazonaws.com/blackjack-ui:$(COMMIT) \
-		-t $(ECR).dkr.ecr.us-east-1.amazonaws.com/blackjack-ui:latest \
+		-t $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT)-arm64 \
 		.
 
-.PHONY: push
-push:
-	docker push $(ECR).dkr.ecr.us-east-1.amazonaws.com/blackjack-ui:$(COMMIT) && \
-	docker push $(ECR).dkr.ecr.us-east-1.amazonaws.com/blackjack-ui:latest
+.PHONY: build-x86
+build-x86:
+	npm run build && docker buildx build --platform linux/amd64 \
+		-t $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT) \
+		.
 
+.PHONY: push-ecr
+push-ecr:
+	docker push $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT) && \
+	docker push $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):latest
+
+.PHONY: push-lightsail
+push-lightsail:
+	aws lightsail push-container-image \
+		--region us-east-1 \
+		--service-name $(SERVICE) \
+		--label $(COMMIT) \
+		--image $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT)
+
+.PHONY: deploy-lightsail
+deploy-lightsail:
+	 ./scripts/deploy-lightsail.sh

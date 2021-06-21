@@ -2,12 +2,12 @@ const path = require("path");
 
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
-module.exports = env => [
+module.exports = ({ production }) => [
   {
     entry: "./src/app/components/index.tsx",
     target: "web",
-    mode: env.production ? "production" : "development",
-    devtool: env.production ? false : "inline-source-map",
+    mode: production ? "production" : "development",
+    devtool: production ? "hidden-source-map" : "inline-source-map",
     devServer: {
       contentBase: "./",
       hot: true,
@@ -21,7 +21,7 @@ module.exports = env => [
           exclude: /node_modules/,
           options: {
             compilerOptions: {
-              sourceMap: !env.production
+              sourceMap: !production
             }
           }
         }
@@ -31,7 +31,7 @@ module.exports = env => [
       extensions: [".tsx", ".ts", ".js"]
     },
     optimization: {
-      minimizer: env.production
+      minimizer: production
         ? [
             () => {
               return () => ({
