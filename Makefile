@@ -30,3 +30,7 @@ push-lightsail:
 .PHONY: deploy-lightsail
 deploy-lightsail:
 	 ./scripts/deploy-lightsail.sh
+
+.PHONY: test
+test:
+	npm run test

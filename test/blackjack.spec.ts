@@ -2,9 +2,11 @@ import {
   Action,
   buildNewDeck,
   dealerExecute,
+  Game,
   GameState,
   getCountForGame,
   getScores,
+  HandStage,
   isBlackJack,
   reducer
 } from "../src/blackjack/blackjack";
@@ -57,49 +59,52 @@ describe("blackjack tests", () => {
 
   test("getCount doesn't mutate input", () => {
     const deck = [3, 4, 5, 6, 2, 10, 10, 10, 10, 1];
-    const dealerCards = [8, 8];
+    const dealerPocket = [8];
+    const dealerHole = 8;
     expect(
       getCountForGame({
         deck,
-        dealerCards,
-        bet: 0,
+        dealerPocket,
+        dealerHole,
         state: GameState.PlayerAction,
         cash: 0,
-        playerCards: []
+        hands: []
       })
     ).toBe(0);
     expect(deck).toEqual([3, 4, 5, 6, 2, 10, 10, 10, 10, 1]);
-    expect(dealerCards).toEqual([8, 8]);
+    expect(dealerPocket).toEqual([8]);
   });
 
   test("getCount returns the correct count with a counted card in dealerCards[1]", () => {
     const deck = [3, 4];
-    const dealerCards = [8, 5];
+    const dealerPocket = [5];
+    const dealerHole = 8;
     expect(
       getCountForGame({
         deck,
-        dealerCards,
-        bet: 0,
+        dealerPocket,
+        dealerHole,
         state: GameState.PlayerAction,
         cash: 0,
-        playerCards: []
+        hands: []
       })
-    ).toBe(3);
+    ).toBe(-3);
   });
 
   test("getCount returns the correct count with a not-counted card in dealerCards[1]", () => {
     const deck = [3, 4];
-    const dealerCards = [5, 9];
+    const dealerPocket = [9];
+    const dealerHole = 5;
     expect(
       getCountForGame({
         deck,
-        dealerCards,
-        bet: 0,
+        dealerPocket,
+        dealerHole,
         state: GameState.PlayerAction,
         cash: 0,
-        playerCards: []
+        hands: []
       })
-    ).toBe(2);
+    ).toBe(-2);
   });
 
   test("dealerExecute doesn't mutate input", () => {
@@ -123,50 +128,92 @@ describe("blackjack tests", () => {
   });
 
   test("reducer bet action doesn't mutate inputs", () => {
-    const deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 0,
+    const deck = [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      1,
+      12,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      1
+    ];
+    const game: Game = {
       deck,
       state: GameState.Bet,
       cash: 100,
-      playerCards: [] as number[],
-      dealerCards: [] as number[]
+      hands: [],
+      dealerPocket: [],
+      dealerHole: 3
     };
     const {
       state,
-      bet,
-      playerCards,
-      dealerCards,
+      hands,
+      dealerPocket,
+      dealerHole,
       deck: newDeck,
       cash
     } = reducer(game, {
       type: "bet",
       value: 10
     });
-    expect(deck).toEqual(concat(range(1, 11), 1));
+    expect(deck).toEqual(
+      concat(range(1, 11), [1, 12, 3, 4, 5, 6, 7, 8, 9, 10, 1])
+    );
     expect(state).toBe(GameState.PlayerAction);
-    expect(bet).toBe(10);
-    expect(playerCards).toEqual([1, 2]);
-    expect(dealerCards).toEqual([3, 4]);
-    expect(newDeck).toEqual([5, 6, 7, 8, 9, 10, 1]);
+    expect(hands[0].cards).toEqual([1, 2]);
+    expect(dealerPocket).toEqual([4]);
+    expect(dealerHole).toEqual(3);
+    expect(newDeck).toEqual([
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      1,
+      12,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      1
+    ]);
     expect(cash).toBe(90);
   });
 
   test("reducer player action Stay doesn't mutate inputs", () => {
     const deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 10,
+    const game: Game = {
       deck,
       state: GameState.PlayerAction,
       cash: 100,
-      playerCards: [10, 4] as number[],
-      dealerCards: [3, 8] as number[]
+      hands: [{ cards: [10, 4], bet: 1, stage: HandStage.PlayerAction }],
+      dealerHole: 3,
+      dealerPocket: [8]
     };
     const {
       state,
-      bet,
-      playerCards,
-      dealerCards,
+      hands,
+      dealerPocket,
+      dealerHole,
       deck: newDeck,
       cash
     } = reducer(game, {
@@ -175,28 +222,28 @@ describe("blackjack tests", () => {
     });
     expect(deck).toEqual(concat(range(1, 11), 1));
     expect(state).toBe(GameState.Settle);
-    expect(bet).toBe(10);
-    expect(playerCards).toEqual([10, 4]);
-    expect(dealerCards).toEqual([3, 8, 1, 2, 3]);
+    expect(hands[0].cards).toEqual([10, 4]);
+    expect(dealerPocket).toEqual([8, 1, 2, 3]);
+    expect(dealerHole).toBe(3);
     expect(newDeck).toEqual([4, 5, 6, 7, 8, 9, 10, 1]);
     expect(cash).toBe(100);
   });
 
   test("reducer player action Hit doesn't mutate inputs with no bust", () => {
     const deck = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 10,
+    const game: Game = {
       deck,
       state: GameState.PlayerAction,
       cash: 100,
-      playerCards: [1, 4] as number[],
-      dealerCards: [10, 3] as number[]
+      hands: [{ cards: [1, 4], bet: 10, stage: HandStage.PlayerAction }],
+      dealerHole: 10,
+      dealerPocket: [3]
     };
     const {
       state,
-      bet,
-      playerCards,
-      dealerCards,
+      hands,
+      dealerPocket,
+      dealerHole,
       deck: newDeck,
       cash
     } = reducer(game, {
@@ -205,28 +252,28 @@ describe("blackjack tests", () => {
     });
     expect(deck).toEqual(concat(range(1, 11), 1));
     expect(state).toBe(GameState.PlayerAction);
-    expect(bet).toBe(10);
-    expect(playerCards).toEqual([1, 4, 1]);
-    expect(dealerCards).toEqual([10, 3]);
+    expect(hands[0].bet).toBe(10);
+    expect(hands[0].cards).toEqual([1, 4, 1]);
+    expect(dealerPocket.concat(dealerHole)).toEqual([3, 10]);
     expect(newDeck).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 1]);
     expect(cash).toBe(100);
   });
 
   test("reducer player action Hit doesn't mutate inputs with bust", () => {
     const deck = [10, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 10,
+    const game: Game = {
       deck,
       state: GameState.PlayerAction,
       cash: 100,
-      playerCards: [10, 4] as number[],
-      dealerCards: [10, 3] as number[]
+      hands: [{ cards: [10, 4], bet: 10, stage: HandStage.PlayerAction }],
+      dealerHole: 10,
+      dealerPocket: [3]
     };
     const {
       state,
-      bet,
-      playerCards,
-      dealerCards,
+      hands,
+      dealerHole,
+      dealerPocket,
       deck: newDeck,
       cash
     } = reducer(game, {
@@ -235,38 +282,36 @@ describe("blackjack tests", () => {
     });
     expect(deck).toEqual(concat(10, range(2, 11), 1));
     expect(state).toBe(GameState.Settle);
-    expect(bet).toBe(10);
-    expect(playerCards).toEqual([10, 4, 10]);
-    expect(dealerCards).toEqual([10, 3]);
+    expect(hands[0].bet).toBe(10);
+    expect(hands[0].cards).toEqual([10, 4, 10]);
+    expect(dealerPocket.concat(dealerHole)).toEqual([3, 10]);
     expect(newDeck).toEqual(concat(range(2, 11), 1));
     expect(cash).toBe(100);
   });
 
   test("reducer settle doesn't mutate inputs with player win", () => {
     const deck = [10, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 10,
+    const game: Game = {
       deck,
       state: GameState.Settle,
       cash: 100,
-      playerCards: [10, 8] as number[],
-      dealerCards: [10, 7] as number[]
+      hands: [{ cards: [10, 8], bet: 10, stage: HandStage.PlayerAction }],
+      dealerHole: 10,
+      dealerPocket: [7]
     };
     const {
       state,
-      bet,
-      playerCards,
-      dealerCards,
+      hands,
+      dealerHole,
+      dealerPocket,
       deck: newDeck,
       cash
     } = reducer(game, {
-      type: "settle",
+      type: "settle"
     });
     expect(deck).toEqual(concat(10, range(2, 11), 1));
     expect(state).toBe(GameState.Bet);
-    expect(bet).toBe(0);
-    expect(playerCards).toEqual([]);
-    expect(dealerCards).toEqual([]);
+    expect(hands).toEqual([]);
     expect(newDeck).toEqual(deck);
     expect(cash).toBe(120);
   });
@@ -278,52 +323,33 @@ describe("blackjack tests", () => {
       deck,
       state: GameState.Settle,
       cash: 100,
-      playerCards: [10, 7] as number[],
-      dealerCards: [10, 8] as number[]
+      hands: [{ cards: [1, 4], bet: 10, stage: HandStage.PlayerAction }],
+      dealerHole: 10,
+      dealerPocket: [8]
     };
-    const {
-      state,
-      bet,
-      playerCards,
-      dealerCards,
-      deck: newDeck,
-      cash
-    } = reducer(game, {
-      type: "settle",
+    const { state, deck: newDeck, cash } = reducer(game, {
+      type: "settle"
     });
     expect(deck).toEqual(concat(10, range(2, 11), 1));
     expect(state).toBe(GameState.Bet);
-    expect(bet).toBe(0);
-    expect(playerCards).toEqual([]);
-    expect(dealerCards).toEqual([]);
     expect(newDeck).toEqual(deck);
     expect(cash).toBe(100);
   });
   test("reducer settle doesn't mutate inputs with push", () => {
     const deck = [10, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1];
-    const game = {
-      bet: 10,
+    const game: Game = {
       deck,
       state: GameState.Settle,
       cash: 100,
-      playerCards: [10, 8] as number[],
-      dealerCards: [10, 8] as number[]
+      hands: [{ cards: [10, 8], bet: 10, stage: HandStage.PlayerAction }],
+      dealerHole: 10,
+      dealerPocket: [8]
     };
-    const {
-      state,
-      bet,
-      playerCards,
-      dealerCards,
-      deck: newDeck,
-      cash
-    } = reducer(game, {
-      type: "settle",
+    const { state, deck: newDeck, cash } = reducer(game, {
+      type: "settle"
     });
     expect(deck).toEqual(concat(10, range(2, 11), 1));
     expect(state).toBe(GameState.Bet);
-    expect(bet).toBe(0);
-    expect(playerCards).toEqual([]);
-    expect(dealerCards).toEqual([]);
     expect(newDeck).toEqual(deck);
     expect(cash).toBe(110);
   });

@@ -119,8 +119,10 @@ export const getCount: (deck: number[]) => number = (deck: number[]) =>
     0
   );
 
-export const getCountForGame: (game: Game) => number = (game: Game) =>
-  getCount(concat(game.deck, game.dealerHole));
+export const getCountForGame: (game: Game) => number = ({
+  deck,
+  dealerPocket
+}: Game) => getCount(concat(deck, dealerPocket));
 
 export const dealerExecute: (
   deck: number[],
@@ -455,7 +457,7 @@ export default function Blackjack() {
         stayOutcome,
         hitOutcome,
         doubleDownOutcome,
-        splitOutcome,
+        splitOutcome
       ] = getOdds(game.deck, activeHand?.cards || [], game.dealerHole);
 
       return (
