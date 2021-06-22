@@ -4,13 +4,16 @@ SERVICE="blackjack-ui"
 
 .PHONY: build
 build:
-	npm run build && docker build \
+	npm ci && npm run build && \
+	echo $(ACCT) && \
+	sudo docker build \
 		-t $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT)-arm64 \
 		.
 
 .PHONY: build-x86
 build-x86:
-	npm run build && docker buildx build --platform linux/amd64 \
+	npm ci && npm run build && \
+		docker buildx build --platform linux/amd64 \
 		-t $(ACCT).dkr.ecr.us-east-1.amazonaws.com/$(SERVICE):$(COMMIT) \
 		.
 
